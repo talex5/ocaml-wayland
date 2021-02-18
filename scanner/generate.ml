@@ -231,7 +231,7 @@ let make_wrappers ~internal role (protocol : Protocol.t) f =
               in
               line "";
               comment f msg.description;
-              line "@[<v2>let %s (_t:'v t) @[<h>%a@] =" (mangle msg.name) (pp_args ~with_types:true) msg.args;
+              line "@[<v2>let %s (_t:([< %a] as 'v) t) @[<h>%a@] =" (mangle msg.name) pp_versions (msg.since, n_versions) (pp_args ~with_types:true) msg.args;
               new_ids |> List.iter (fun (arg : Arg.t) ->
                   let m = mangle arg.name in
                   line "let __%s = Proxy.spawn%s _t %s in"
