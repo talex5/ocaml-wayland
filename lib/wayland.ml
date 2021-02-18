@@ -16,7 +16,8 @@ let callback fn : ([ `Wl_callback ], 'v, 'v, [`V1]) Proxy.handler =
 module Fixed = Fixed
 (** Wayland's 24.8 fixed-point type. *)
 
-module Log = Log
+let src = Log.src
+(** Control the library's log level. *)
 
 (** {2 Generated bindings for the core Wayland protocol} *)
 
