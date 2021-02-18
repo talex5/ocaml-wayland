@@ -1,0 +1,8 @@
+(library
+  (public_name wayland)
+  (libraries lwt lwt.unix logs cstruct fmt))
+
+(rule
+ (targets wayland_client.ml wayland_server.ml wayland_proto.ml)
+ (deps   wayland.xml)
+ (action (run %{bin:wayland-scanner-ocaml} --internal %{deps})))

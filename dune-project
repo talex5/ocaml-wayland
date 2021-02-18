@@ -1,0 +1,18 @@
+(lang dune 2.8)
+(name wayland)
+(formatting disabled)
+(generate_opam_files true)
+(source (github talex5/ocaml-wayland))
+(authors "talex5@gmail.com")
+(maintainers "talex5@gmail.com")
+(package
+ (name wayland)
+ (synopsis "Pure OCaml Wayland protocol library")
+ (depends
+  (ocaml (>= 4.08.0))
+  (xmlm (>= 1.3.0))
+  (lwt (>= 5.4.0))
+  (logs (>= 0.7.0))
+  (fmt (>= 0.8.9))
+  (cstruct (>= 6.0.0))
+  (cmdliner (>= 1.0.4))))

@@ -1,0 +1,9 @@
+(library
+  (name wayland_protocols)
+  (public_name wayland.protocols)
+  (libraries wayland))
+
+(rule
+ (targets xdg_shell_client.ml xdg_shell_server.ml xdg_shell_proto.ml)
+ (deps   xdg-shell.xml)
+ (action (run %{bin:wayland-scanner-ocaml} %{deps})))
