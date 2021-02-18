@@ -5,6 +5,7 @@
 (source (github talex5/ocaml-wayland))
 (authors "talex5@gmail.com")
 (maintainers "talex5@gmail.com")
+(documentation "https://talex5.github.io/ocaml-wayland/")
 (package
  (name wayland)
  (synopsis "Pure OCaml Wayland protocol library")

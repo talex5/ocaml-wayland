@@ -4,6 +4,7 @@ synopsis: "Pure OCaml Wayland protocol library"
 maintainer: ["talex5@gmail.com"]
 authors: ["talex5@gmail.com"]
 homepage: "https://github.com/talex5/ocaml-wayland"
+doc: "https://talex5.github.io/ocaml-wayland/"
 bug-reports: "https://github.com/talex5/ocaml-wayland/issues"
 depends: [
   "dune" {>= "2.8"}

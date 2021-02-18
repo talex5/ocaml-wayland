@@ -2,6 +2,8 @@
 
 Status: **prototyping**
 
+* [API documentation][]
+
 Wayland is a communications protocol intended for use between processes on a single computer.
 It is mainly used by graphical applications (clients) to talk to display servers,
 but nothing about the protocol is specific to graphics and it could be used for other things.
@@ -56,6 +58,8 @@ To run it:
 
 It shows a scrolling grid of squares.
 
+See the [API documentation][] for more information.
+
 ## Interface versions
 
 Each proxy object has phantom types for the interface and the version(s) of that interface.
@@ -72,3 +76,4 @@ e.g. `Wl_surface.v3` could be used to create the proxy above.
 
 [The Wayland Protocol]: https://wayland-book.com/
 [Cap'n Proto RPC]: https://github.com/mirage/capnp-rpc
+[API documentation]: https://talex5.github.io/ocaml-wayland/wayland/index.html
