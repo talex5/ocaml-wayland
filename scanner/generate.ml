@@ -1,10 +1,9 @@
 open Schema
 
-let module_name (iface : Interface.t) =
-  String.capitalize_ascii iface.name
+let module_name = String.capitalize_ascii
 
 let full_module_name (proto : Protocol.t) (iface : Interface.t) =
-  Fmt.strf "%s_proto.%s" (String.capitalize_ascii proto.name) (module_name iface)
+  Fmt.strf "%s_proto.%s" (String.capitalize_ascii proto.name) (module_name iface.name)
 
 let mangle name =
   let name =
@@ -189,6 +188,54 @@ let get_versions ~n_versions (iface : Interface.t) =
       | _ -> true
     )
 
+let pp_ctor f enum =
+  let enum =
+    match enum.[0] with
+    | '0' .. '9' -> "V" ^ enum
+    | _ -> enum
+  in
+  Fmt.string f (String.capitalize_ascii enum)
+
+let pp_enum f (enum : Enum.t) =
+  Fmt.pf f "@,";
+  comment f enum.description;
+  Fmt.pf f "@,@[<v2>module %s = struct" (module_name enum.name);
+  if enum.bitfield then (
+    Fmt.pf f "@,type t = int32";
+    enum.entries |> List.iter (fun (e : Entry.t) ->
+        Fmt.pf f "@,";
+        comment f e.description;
+        Fmt.pf f "@,let %s = %ld" (mangle e.name) e.value
+      );
+    Fmt.pf f "@,";
+    Fmt.pf f "@,let to_int32 = Fun.id";
+    Fmt.pf f "@,let of_int32 = Fun.id";
+  ) else (
+    Fmt.pf f "@,@[<v2>type t =";
+    enum.entries |> List.iter (fun (e : Entry.t) ->
+        Fmt.pf f "@,@[<v2>| %a : t%a@]" pp_ctor e.name
+          comment e.description
+      );
+    Fmt.pf f "@]@,@,@[<v2>let to_int32 = function";
+    enum.entries |> List.iter (fun (e : Entry.t) ->
+        Fmt.pf f "@,| %a -> %ldl" pp_ctor e.name e.value
+      );
+    Fmt.pf f "@]@,@,@[<v2>let of_int32 = function";
+    enum.entries |> List.iter (fun (e : Entry.t) ->
+        Fmt.pf f "@,| %ldl -> %a" e.value pp_ctor e.name
+      );
+    Fmt.pf f {|@,| x -> Fmt.failwith "Invalid %s enum value %%ld" x|} enum.name;
+    Fmt.pf f "@]"
+  );
+  Fmt.pf f "@]@,end"
+
+let pp_enum_link (protocol : Protocol.t) (iface : Interface.t) f (enum : Enum.t) =
+  Fmt.pf f "@,module %s = %s_proto.%s.%s"
+    (module_name enum.name)
+    (module_name protocol.name)
+    (module_name iface.name)
+    (module_name enum.name)
+
 let make_wrappers ~internal role (protocol : Protocol.t) f =
   let parents = Parent.index protocol in
   let line fmt = Fmt.pf f ("@," ^^ fmt) in
@@ -209,8 +256,9 @@ let make_wrappers ~internal role (protocol : Protocol.t) f =
       let versions = get_versions ~n_versions iface in
       line "";
       comment f iface.description;
-      line "@[<v2>module %s = struct" (module_name iface);
+      line "@[<v2>module %s = struct" (module_name iface.name);
       line "type 'v t = (%a, 'v) Proxy.t" pp_poly iface.name;
+      Fmt.list (pp_enum_link protocol iface) f iface.enums;
       let prev_version = ref 0 in
       let have_incoming = ref false in
       versions |> List.iter (fun (group : version_group) ->
@@ -252,6 +300,20 @@ let make_wrappers ~internal role (protocol : Protocol.t) f =
                     line "Msg.add_int _msg (Proxy.id __%s);" m
                   | `Object _ ->
                     line "Msg.add_int _msg (Proxy.id %s);" m
+                  | `Int | `Uint when arg.enum <> None ->
+                    let enum =
+                      Option.get arg.enum
+                      |> String.split_on_char '.'
+                      |> List.map module_name
+                    in
+                    let enum =
+                      match enum with
+                      | [leaf] -> [module_name iface.name; leaf]
+                      | x -> x
+                    in
+                    line "Msg.add_int _msg (%s_proto.%a.to_int32 %s);"
+                      (module_name protocol.name)
+                      Fmt.(list ~sep:(unit ".") string) enum m
                   | _ ->
                     line "Msg.add_%a _msg %s;" pp_type_getter arg.ty m
                 );
@@ -323,8 +385,9 @@ let output ~internal (protocol : Protocol.t) =
         line "module Proxy = Wayland.Proxy"
       );
       protocol.interfaces |> List.iter (fun (iface : Interface.t) ->
-          line "@[<v2>module %s = struct" (module_name iface);
+          line "@[<v2>module %s = struct" (module_name iface.name);
           line "let interface = %S" iface.name;
+          Fmt.(list ~sep:cut) pp_enum f iface.enums;
           line "";
           line "@[<v2>let requests = %a@]@," (op_info "request") iface.requests;
           line "@[<v2>let events = %a@]@]" (op_info "event") iface.events;

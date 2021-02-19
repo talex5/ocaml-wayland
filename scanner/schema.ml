@@ -8,6 +8,11 @@ let int_of_string x v =
   | Some i -> i
   | None -> Fmt.failwith "Not an integer %S at %a" v Xml.pp x
 
+let int32_of_string x v =
+  match Int32.of_string_opt v with
+  | Some i -> i
+  | None -> Fmt.failwith "Not an int32 %S at %a" v Xml.pp x
+
 module Description = struct
   type t = {
     summary : string;
@@ -24,7 +29,7 @@ end
 module Entry = struct
   type t = {
     name : string;
-    value : string;
+    value : int32;
     summary : string option;
     since : int;
     description : Description.t option;
@@ -33,7 +38,7 @@ module Entry = struct
   let parse x =
     {
       name = Xml.take_attr "name" x;
-      value = Xml.take_attr "value" x;
+      value = Xml.take_attr "value" x |> int32_of_string x;
       summary = Xml.take_attr_opt "summary" x;
       since = Xml.take_attr_opt "since" x |> Option.value ~default:"1" |> int_of_string x;
       description = Xml.take_sole_opt "description" x Description.parse;
