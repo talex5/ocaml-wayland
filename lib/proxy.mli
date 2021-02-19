@@ -1,4 +1,4 @@
-type ('a, 'v) t
+type ('a, +'v) t
 (** An [('a, 'v) t] sends messages to an object with interface ['a] and version in ['v]. *)
 
 type ('a, 'v, 'vspawn, 'vbind) handler

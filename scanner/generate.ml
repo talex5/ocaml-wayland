@@ -1,5 +1,10 @@
 open Schema
 
+let rec list_last = function
+  | [] -> assert false
+  | [x] -> x
+  | _ :: xs -> list_last xs
+
 let module_name = String.capitalize_ascii
 
 let full_module_name (proto : Protocol.t) (iface : Interface.t) =
@@ -357,12 +362,13 @@ let make_wrappers ~internal role (protocol : Protocol.t) f =
           line "(**/**)";
           line "";
           group.versions |> List.iter (fun minor_version ->
+              let end_group = list_last group.versions in
               if !have_incoming then (
                 line "@[<v2>let v%d (handlers:'v h%d)" minor_version version;
               ) else (
                 line "@[<v2>let v%d ()" minor_version;
               );
-              Fmt.pf f " : (_, 'v, [< %a], [> `V%d]) Proxy.handler = Proxy.handler" pp_versions (1, minor_version) minor_version;
+              Fmt.pf f " : (_, 'v, [< %a], [> `V%d]) Proxy.handler = Proxy.handler" pp_versions (1, end_group) minor_version;
               line "(module %s)" (full_module_name protocol iface);
               line "~version:%dl" minor_version;
               if !have_incoming then (
