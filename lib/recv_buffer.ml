@@ -19,7 +19,7 @@ let create size =
     prod = 0;
   }
 
-let io_vec t =
+let free_buffer t =
   if free_space t = 0 && t.cons > 0 then (
     (* We've reached the end of the buffer part-way through a message.
        Move the part we've got to the beginning of the buffer. *)
@@ -29,9 +29,7 @@ let io_vec t =
     t.cons <- 0;
     t.prod <- len;
   );
-  let v = Lwt_unix.IO_vectors.create () in
-  Lwt_unix.IO_vectors.append_bigarray v t.buffer t.prod (free_space t);
-  v
+  Cstruct.of_bigarray t.buffer ~off:t.prod ~len:(free_space t)
 
 let update_producer t n =
   assert (n > 0);

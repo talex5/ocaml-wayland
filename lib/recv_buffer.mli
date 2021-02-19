@@ -3,11 +3,11 @@ type t
 val create : int -> t
 (** [create size] is a fresh buffer that can hold up to [size] bytes. *)
 
-val io_vec : t -> Lwt_unix.IO_vectors.t
-(** [io_vec t] is a vector for the contiguous free space in the buffer. *)
+val free_buffer : t -> Cstruct.t
+(** [free_buffer t] is the contiguous free space in the buffer, for the next read operation. *)
 
 val update_producer : t -> int -> unit
-(** [update_producer t got] records that [got] bytes were written to [io_vec t]. *)
+(** [update_producer t got] records that [got] bytes were written to [free_buffer t]. *)
 
 val data_avail : t -> int
 (** [data_avail t] is the number of bytes of data available in the buffer. *)

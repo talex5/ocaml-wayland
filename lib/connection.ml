@@ -46,8 +46,7 @@ let rec process_recv_buffer t recv_buffer =
 let listen t =
   let recv_buffer = Recv_buffer.create 4096 in
   let rec aux () =
-    let io_vectors = Recv_buffer.io_vec recv_buffer in
-    let* (got, fds) = t.transport#recv io_vectors in
+    let* (got, fds) = t.transport#recv (Recv_buffer.free_buffer recv_buffer) in
     List.iter (fun fd -> Queue.add fd t.incoming_fds) fds;
     if got = 0 then (
       Log.info (fun f -> f "Got end-of-file on wayland connection");

@@ -24,7 +24,9 @@ let of_socket socket = object (_ : S.transport)
     in
     send_all ~fds
 
-  method recv io_vectors =
+  method recv { Cstruct.buffer; off; len } =
+    let io_vectors = Lwt_unix.IO_vectors.create () in
+    Lwt_unix.IO_vectors.append_bigarray io_vectors buffer off len;
     Lwt_unix.recv_msg ~socket ~io_vectors
 end
 
