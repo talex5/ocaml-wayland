@@ -26,11 +26,26 @@ let mangle name =
 let pp_poly f name =
   Fmt.pf f "[`%s]" (String.capitalize_ascii (mangle name))
 
-let pp_type f (ty:Arg.ty) =
+let pp_enum_module (protocol : Protocol.t) (iface : Interface.t) f (arg:Arg.t) =
+  let enum =
+    Option.get arg.enum
+    |> String.split_on_char '.'
+    |> List.map module_name
+  in
+  let enum =
+    match enum with
+    | [leaf] -> [module_name iface.name; leaf]
+    | x -> x
+  in
+  Fmt.pf f "%s_proto.%a"
+    (module_name protocol.name)
+    Fmt.(list ~sep:(unit ".") string) enum
+
+let pp_type proto iface f (arg:Arg.t) =
   Fmt.string f @@
-  match ty with
-  | `Uint -> "int32"
-  | `Int -> "int32"
+  match arg.ty with
+  | `Uint | `Int when arg.enum <> None -> Fmt.strf "%a.t" (pp_enum_module proto iface) arg
+  | `Uint | `Int -> "int32"
   | `String -> "string"
   | `Array -> "string"
   | `Object _ -> "int32"
@@ -56,15 +71,15 @@ let named_argument (arg : Arg.t) =
   | `Object _ -> arg.name <> "id"
   | _ -> true
 
-let pp_arg f arg =
+let pp_arg proto iface f arg =
   if named_argument arg then
-    Fmt.pf f "%s:%a" (mangle arg.name) pp_type arg.ty
+    Fmt.pf f "%s:%a" (mangle arg.name) (pp_type proto iface) arg
   else
-    pp_type f arg.ty
+    pp_type proto iface f arg
 
-let pp_sig f = function
+let pp_sig proto iface f = function
   | [] -> Fmt.string f "unit"
-  | args -> Fmt.(list ~sep:(unit " ->@ ") pp_arg ++ any " ->@ unit") f args
+  | args -> Fmt.(list ~sep:(unit " ->@ ") (pp_arg proto iface) ++ any " ->@ unit") f args
 
 let pp_args ~with_types =
   let pp_arg f arg =
@@ -225,7 +240,8 @@ let pp_enum f (enum : Enum.t) =
     enum.entries |> List.iter (fun (e : Entry.t) ->
         Fmt.pf f "@,| %a -> %ldl" pp_ctor e.name e.value
       );
-    Fmt.pf f "@]@,@,@[<v2>let of_int32 = function";
+    Fmt.pf f "@]";
+    Fmt.pf f "@,@,@[<v2>let of_int32 = function";
     enum.entries |> List.iter (fun (e : Entry.t) ->
         Fmt.pf f "@,| %ldl -> %a" e.value pp_ctor e.name
       );
@@ -306,19 +322,8 @@ let make_wrappers ~internal role (protocol : Protocol.t) f =
                   | `Object _ ->
                     line "Msg.add_int _msg (Proxy.id %s);" m
                   | `Int | `Uint when arg.enum <> None ->
-                    let enum =
-                      Option.get arg.enum
-                      |> String.split_on_char '.'
-                      |> List.map module_name
-                    in
-                    let enum =
-                      match enum with
-                      | [leaf] -> [module_name iface.name; leaf]
-                      | x -> x
-                    in
-                    line "Msg.add_int _msg (%s_proto.%a.to_int32 %s);"
-                      (module_name protocol.name)
-                      Fmt.(list ~sep:(unit ".") string) enum m
+                    line "Msg.add_int _msg (%a.to_int32 %s);"
+                      (pp_enum_module protocol iface) arg m
                   | _ ->
                     line "Msg.add_%a _msg %s;" pp_type_getter arg.ty m
                 );
@@ -339,7 +344,7 @@ let make_wrappers ~internal role (protocol : Protocol.t) f =
           if version > 1 then line "inherit ['v] h%d" !prev_version;
           line "";
           msgs_in |> List.iter (fun (_, (msg : Message.t)) ->
-              line "method virtual on_%s : 'v t -> @[%a@]" msg.name pp_sig msg.args;
+              line "method virtual on_%s : 'v t -> @[%a@]" msg.name (pp_sig protocol iface) msg.args;
               comment f msg.description;
               Fmt.cut f ()
             );
@@ -351,7 +356,13 @@ let make_wrappers ~internal role (protocol : Protocol.t) f =
           msgs_in |> List.iter (fun (i, (msg : Message.t)) ->
               line "@[<v2>| %d ->" i;
               msg.args |> List.iter (fun (arg : Arg.t) ->
-                  line "let %s = Msg.get_%a _msg in" (mangle arg.name) pp_type_getter arg.ty;
+                  line "let %s = Msg.get_%a _msg" (mangle arg.name) pp_type_getter arg.ty;
+                  begin match arg.ty with
+                    | `Int | `Uint when arg.enum <> None ->
+                      Fmt.pf f " |> %a.of_int32" (pp_enum_module protocol iface) arg
+                    | _ -> ()
+                  end;
+                  Fmt.pf f " in"
                 );
               line "_handlers#on_%s _proxy @[%a@]@]" msg.name (pp_args ~with_types:false) msg.args;
             );

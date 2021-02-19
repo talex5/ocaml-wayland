@@ -85,7 +85,8 @@ let () =
         method on_leave     _ ~serial:_ ~surface:_ = ()
         method on_key       _ ~serial:_ ~time:_ ~key ~state =
           (* Change colour on key-presses *)
-          if state = 1l then t.fg <- Int32.(logand 0xffffffl (add t.fg (shift_left 0x101l (0xf land (Int32.to_int key)))))
+          if state = Wl_keyboard.Key_state.Pressed then
+            t.fg <- Int32.(logand 0xffffffl (add t.fg (shift_left 0x101l (0xf land (Int32.to_int key)))))
         method on_modifiers _ ~serial:_ ~mods_depressed:_ ~mods_latched:_ ~mods_locked:_ ~group:_ = ()
       end
     in
