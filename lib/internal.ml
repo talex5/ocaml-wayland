@@ -3,7 +3,7 @@ open Lwt.Syntax
 module Objects = Map.Make(Int32)
 
 type connection = {
-  socket : Lwt_unix.file_descr;
+  transport : S.transport;
   role : [`Client | `Server];
   mutable objects : generic_handler Objects.t;
   mutable free_ids : int32 list;
@@ -40,18 +40,10 @@ let free_id t id =
 let rec transmit t =
   let msg = Queue.peek t.outbox in  (* Just peek, to show that we're still running *)
   let buffer = Msg.buffer msg in
-  let fds = Msg.fds msg in
-  let v = Lwt_unix.IO_vectors.create () in
-  Lwt_unix.IO_vectors.append_bigarray v buffer 0 (Lwt_bytes.length buffer);  (* todo: could do several at once *)
-  let rec send_all () =
-    let fds = Queue.to_seq fds |> List.of_seq in
-    let* sent = Lwt_unix.send_msg ~socket:t.socket ~io_vectors:v ~fds in
-    List.iter Unix.close fds;
-    Lwt_unix.IO_vectors.drop v sent;
-    if Lwt_unix.IO_vectors.is_empty v then Lwt.return_unit
-    else send_all ()
-  in
-  let* () = send_all () in
+  let fds = Msg.fds msg |> Queue.to_seq |> List.of_seq in
+  (* todo: could do several messages at once *)
+  let* () = t.transport#send (Cstruct.of_bigarray buffer) fds in
+  List.iter Unix.close fds;
   ignore (Queue.pop t.outbox);
   if Queue.is_empty t.outbox then
     Lwt.return_unit

@@ -1,4 +1,3 @@
-open Lwt.Syntax
 open Wayland_client
 
 type t = {
@@ -6,8 +5,8 @@ type t = {
   wl_display : [`V1] Wl_display.t;
 }
 
-let connect () =
-  let* conn, wl_display = Connection.connect @@ Wl_display.v1 @@ object
+let connect transport =
+  let conn, wl_display = Connection.connect transport @@ Wl_display.v1 @@ object
       method on_error _ ~object_id ~code ~message =
         Log.err (fun f -> f "Received Wayland error: %ld %s on object %ld" code message object_id)
 
@@ -16,7 +15,7 @@ let connect () =
     end
   in
   Lwt.async (fun () -> Connection.listen conn);
-  Lwt.return { conn; wl_display }
+  { conn; wl_display }
 
 let sync t =
   let result, set_result = Lwt.wait () in

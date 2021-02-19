@@ -55,7 +55,8 @@ let () =
   Logs.(set_level (Some Info));
   Lwt_main.run begin
     (* Connect to the server. *)
-    let* display = Wayland.Display.connect () in
+    let* transport = Wayland.Unix_transport.connect () in
+    let display = Wayland.Display.connect transport in
     (* Get the registry and find the objects we need. *)
     let* reg = Registry.of_display display in
     let compositor = Registry.bind reg (Wl_compositor.v4 ()) in

@@ -1,3 +1,6 @@
+module Unix_transport = Unix_transport
+(** Send messages over a Unix-domain socket. *)
+
 module Display = Display
 (** Connect to a Wayland server and interact with the initial display object. *)
 
@@ -40,3 +43,6 @@ module Metadata = Metadata
 
 module Msg = Msg
 (** Building and parsing messages. *)
+
+module S = S
+(** Type signatures. *)
