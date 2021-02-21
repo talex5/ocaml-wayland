@@ -1,5 +1,5 @@
 test:
-	dune build @check
+	dune build @check @runtest
 
 run: test
 	dune exec -- ./example/test.exe

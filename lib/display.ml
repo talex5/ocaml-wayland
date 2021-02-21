@@ -6,7 +6,7 @@ type t = {
 }
 
 let connect transport =
-  let conn, wl_display = Connection.connect transport @@ Wl_display.v1 @@ object
+  let conn, wl_display = Connection.connect `Client transport @@ Wl_display.v1 @@ object
       method on_error _ ~object_id ~code ~message =
         Log.err (fun f -> f "Received Wayland error: %ld %s on object %ld" code message object_id)
 

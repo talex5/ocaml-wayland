@@ -42,16 +42,17 @@ let pp_enum_module (protocol : Protocol.t) (iface : Interface.t) f (arg:Arg.t) =
     Fmt.(list ~sep:(unit ".") string) enum
 
 let pp_type proto iface f (arg:Arg.t) =
-  Fmt.string f @@
   match arg.ty with
-  | `Uint | `Int when arg.enum <> None -> Fmt.strf "%a.t" (pp_enum_module proto iface) arg
-  | `Uint | `Int -> "int32"
-  | `String -> "string"
-  | `Array -> "string"
-  | `Object _ -> "int32"
-  | `New_ID _ -> "int32"
-  | `Fixed -> "Fixed.t"
-  | `FD -> "Unix.file_descr"
+  | `Uint | `Int when arg.enum <> None -> Fmt.pf f "%a.t" (pp_enum_module proto iface) arg
+  | `Uint | `Int -> Fmt.string f "int32"
+  | `String -> Fmt.string f "string"
+  | `Array -> Fmt.string f "string"
+  | `Object None -> Fmt.string f "int32"
+  | `New_ID None -> Fmt.string f "Proxy.generic"
+  | `Object (Some i)
+  | `New_ID (Some i) -> Fmt.pf f "(%a, 'v) Proxy.t" pp_poly i
+  | `Fixed -> Fmt.string f "Fixed.t"
+  | `FD -> Fmt.string f "Unix.file_descr"
 
 let pp_type_getter f (ty:Arg.ty) =
   Fmt.string f @@
@@ -270,6 +271,7 @@ let make_wrappers ~internal role (protocol : Protocol.t) f =
     line "@,module Proxy = Wayland.Proxy";
     line "module Msg = Wayland.Msg";
     line "module Fixed = Wayland.Fixed";
+    line "module Iface_reg = Wayland.Iface_reg";
   );
   line "";
   protocol.interfaces |> List.iter (fun (iface : Interface.t) ->
@@ -358,13 +360,24 @@ let make_wrappers ~internal role (protocol : Protocol.t) f =
           msgs_in |> List.iter (fun (i, (msg : Message.t)) ->
               line "@[<v2>| %d ->" i;
               msg.args |> List.iter (fun (arg : Arg.t) ->
-                  line "let %s = Msg.get_%a _msg" (mangle arg.name) pp_type_getter arg.ty;
+                  line "@[<v2>let %s " (mangle arg.name);
                   begin match arg.ty with
                     | `Int | `Uint when arg.enum <> None ->
-                      Fmt.pf f " |> %a.of_int32" (pp_enum_module protocol iface) arg
-                    | _ -> ()
+                      Fmt.pf f "= Msg.get_int _msg |> %a.of_int32 in@]"  (pp_enum_module protocol iface) arg
+                    | `New_ID None ->
+                      Fmt.pf f "=";
+                      line "let interface = Msg.get_string _msg |> Iface_reg.lookup in";
+                      line "let version = Msg.get_int _msg in";
+                      line "let id = Msg.get_int _msg in";
+                      line "Proxy.Service_handler.accept_new _proxy id ~interface ~version@]@,in";
+                    | `New_ID (Some i) ->
+                      Fmt.pf f ": (%a, _) Proxy.t =@ Msg.get_int _msg |> Proxy.Handler.accept_new _proxy in@]"
+                        pp_poly i
+                    | `Object (Some i) ->
+                      Fmt.pf f ": (%a, _) Proxy.t =@ Msg.get_int _msg |> Proxy.lookup_other_unsafe ~interface:%S _proxy in@]" pp_poly i i
+                    | _ ->
+                      Fmt.pf f "= Msg.get_%a _msg in@]" pp_type_getter arg.ty
                   end;
-                  Fmt.pf f " in"
                 );
               line "_handlers#on_%s _proxy @[%a@]@]" msg.name (pp_args ~with_types:false) msg.args;
             );
@@ -382,10 +395,10 @@ let make_wrappers ~internal role (protocol : Protocol.t) f =
                 line "@[<v2>let v%d ?user_data ()" minor_version;
               );
               if is_service then (
-                Fmt.pf f " : (_, [> `V%d]) Proxy.Service_handler.t = Proxy.Service_handler.v" minor_version;
+                Fmt.pf f " : (%a, [> `V%d]) Proxy.Service_handler.t = Proxy.Service_handler.v" pp_poly iface.name minor_version;
                 line "~version:%dl" minor_version;
               ) else (
-                Fmt.pf f " : (_, [< %a]) Proxy.Handler.t = Proxy.Handler.v" pp_versions (1, end_group);
+                Fmt.pf f " : (%a, [< %a]) Proxy.Handler.t = Proxy.Handler.v" pp_poly iface.name pp_versions (1, end_group);
               );
               line "?user_data";
               line "(module %s)" (full_module_name protocol iface);
@@ -406,7 +419,8 @@ let output ~internal (protocol : Protocol.t) =
   with_output (file_base ^ "_proto.ml") (fun f ->
       let line fmt = Fmt.pf f ("@," ^^ fmt) in
       if not internal then (
-        line "module Proxy = Wayland.Proxy"
+        line "module Proxy = Wayland.Proxy";
+        line "module Iface_reg = Wayland.Iface_reg"
       );
       protocol.interfaces |> List.iter (fun (iface : Interface.t) ->
           line "@[<v2>module %s = struct" (module_name iface.name);
@@ -414,8 +428,10 @@ let output ~internal (protocol : Protocol.t) =
           Fmt.(list ~sep:cut) pp_enum f iface.enums;
           line "";
           line "@[<v2>let requests = %a@]@," (op_info "request") iface.requests;
-          line "@[<v2>let events = %a@]@]" (op_info "event") iface.events;
-          line "end@,";
+          line "@[<v2>let events = %a@]@," (op_info "event") iface.events;
+          line "type _ Iface_reg.ty += T : %a Iface_reg.ty" pp_poly iface.name;
+          Fmt.pf f "@]@,end";
+          line "let () = Iface_reg.register %s.T (module %s)@," (module_name iface.name) (module_name iface.name);
         );
     );
   with_output (file_base ^ "_server.ml") (make_wrappers ~internal `Server protocol);

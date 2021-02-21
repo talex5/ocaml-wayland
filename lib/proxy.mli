@@ -3,6 +3,14 @@ type ('a, +'v) t
 
 type ('a, 'v) proxy := ('a, 'v) t               (* Alias for use inside this file only *)
 
+type generic = Proxy : 'a Iface_reg.ty * ('a, [`Unknown]) t -> generic
+(** A proxy with its type metadata.
+    Pattern match on the type metadata to discover the proxy's type. *)
+
+val delete : _ t -> unit
+(** [delete t] sends a delete event from object 1 and removes [t] from the
+    object table. This is only used in server code. *)
+
 val user_data : ('a, _) t -> 'a S.user_data
 (** [user_data t] returns the data attached to the proxy when it was created.
     Returns [No_data] if nothing was attached. *)
@@ -32,6 +40,15 @@ module Handler : sig
   (** If the version rules turn out to be too restrictive, this can be used to disable them.
       Using this incorrectly may lead to a protocol error (such as receiving an event for which
       no handler was registered). *)
+
+  val accept_new : (_, 'v) proxy -> int32 -> ('a, 'v) proxy
+  (** [accept_new parent id] registers a new object, with an ID allocated by the peer.
+      The resulting proxy is in a half-initialised state.
+      You must call {!attach} on it before switching threads or doing anything else with it. *)
+
+  val attach : ('a, 'v) proxy -> ('a, 'v) t -> unit
+  (** [attach proxy t] sets [t] as the handler for [proxy],
+      which must be a partly initialised proxy returned by [accept_new]. *)
 end
 
 module Service_handler : sig
@@ -62,6 +79,18 @@ module Service_handler : sig
   (** If the version rules turn out to be too restrictive, this can be used to disable them.
       Using this incorrectly may lead to a protocol error (such as receiving an event for which
       no handler was registered). *)
+
+  val accept_new : (_, 'v) proxy -> int32 -> interface:Iface_reg.interface -> version:int32 -> generic
+  (** [accept_new parent id ~interface ~version] registers a new object,
+      with an ID allocated by the peer.
+      The returned proxy must have its handlers attached before switching threads,
+      since otherwise processing a message addressed to the new object will fail.
+      This is called from the generated code; the user code then calls the result. *)
+
+  val attach : ('a, [`Unknown]) proxy -> ('a, 'v) t -> ('a, 'v) proxy
+  (** [attach proxy t] sets [t] as the handler for [proxy],
+      which must be a partly initialised proxy returned by [accept_new].
+      It returns the proxy with its version cast to the handler's version. *)
 end
 
 val id : _ t -> int32
@@ -104,3 +133,10 @@ val add_root : Internal.connection -> ('a, 'v) Service_handler.t -> ('a, 'v) t
 
 val delete_other : _ t -> int32 -> unit
 (** [delete_other proxy id] removes [id] from [proxy]'s connection. Internal use only. *)
+
+val lookup_other_unsafe : interface:string -> (_, 'v) t -> int32 -> (_, 'v) t
+(** [lookup_other ~interface parent id] returns the proxy with [id] in [parent]'s connection.
+    It assumes the child proxy has the same version.
+    You MUST cast the result to the type [`Interface] (the equivalent of [interface]).
+    @param interface Used to check that the object has the expected type, since the other end
+                     could send us an invalid ID. *)

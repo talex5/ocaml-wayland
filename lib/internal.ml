@@ -5,7 +5,7 @@ module Objects = Map.Make(Int32)
 type connection = {
   transport : S.transport;
   role : [`Client | `Server];
-  mutable objects : generic_handler Objects.t;
+  mutable objects : generic_proxy Objects.t;
   mutable free_ids : int32 list;
   mutable next_id : int32;
   incoming_fds : Unix.file_descr Queue.t;
@@ -13,13 +13,16 @@ type connection = {
 } and 'a proxy = {
   id : int32;
   conn : connection;
-  metadata : (module Metadata.S);
   version : int32;
-  user_data : 'a S.user_data;
+  mutable handler : 'a handler;
   mutable valid : bool;
 }
-and generic_handler = Handler : 'a proxy * 'a handler -> generic_handler
-and 'a handler = 'a proxy -> ('a, [`R]) Msg.t -> unit
+and generic_proxy = Generic : 'a proxy -> generic_proxy
+and 'a handler = {
+  user_data : 'a S.user_data;
+  metadata : (module Metadata.S);
+  dispatch : 'a proxy -> ('a, [`R]) Msg.t -> unit;
+}
 
 let get_unused_id t =
   match t.free_ids with
@@ -57,5 +60,5 @@ let enqueue t buf =
   if start_transmit_thread then Lwt.async (fun () -> transmit t)
 
 let pp_proxy f (x: _ proxy) =
-  let (module M) = x.metadata in
+  let (module M) = x.handler.metadata in
   Fmt.pf f "%s@%ld" M.interface x.id

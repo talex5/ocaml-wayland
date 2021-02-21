@@ -115,7 +115,7 @@ let fds t = t.fds
 
 let cast = Fun.id
 
-let pop_and_show_arg f t : Metadata.ty -> unit = function
+let pop_and_show_arg f t : Metadata.param -> unit = function
   | `Int ->
     Fmt.pf f "%ld" (get_int t)
   | `Uint ->

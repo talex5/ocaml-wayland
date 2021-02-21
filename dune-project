@@ -10,6 +10,7 @@
  (name wayland)
  (synopsis "Pure OCaml Wayland protocol library")
  (depends
+  (alcotest-lwt (and (>= 1.2.3) :with-test))
   (ocaml (>= 4.08.0))
   (xmlm (>= 1.3.0))
   (lwt (>= 5.4.0))

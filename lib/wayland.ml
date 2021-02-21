@@ -16,6 +16,9 @@ let callback fn : ([ `Wl_callback ], [> `V1]) Proxy.Handler.t =
     method on_done _ ~callback_data = fn callback_data
   end
 
+module Server = Server
+(** Code for writing Wayland servers. *)
+
 module Fixed = Fixed
 (** Wayland's 24.8 fixed-point type. *)
 
@@ -46,3 +49,6 @@ module Msg = Msg
 
 module S = S
 (** Type signatures. *)
+
+module Iface_reg = Iface_reg
+(** Registry of known interfaces. Used by the generated code. *)

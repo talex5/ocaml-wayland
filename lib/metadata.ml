@@ -1,4 +1,4 @@
-type ty = [
+type param = [
   | `Uint 
   | `Int 
   | `String 
@@ -9,7 +9,7 @@ type ty = [
   | `FD 
 ]
 
-type arg = string * ty
+type arg = string * param
 (** Argument name and type. *)
 
 type info = int -> string * arg list

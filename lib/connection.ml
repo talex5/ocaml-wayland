@@ -3,10 +3,10 @@ open Internal
 
 type t = Internal.connection
 
-let connect transport handler =
+let connect role transport handler =
     let t = {
       transport;
-      role = `Client;
+      role;
       objects = Objects.empty;
       free_ids = [];
       next_id = 2l;
@@ -25,9 +25,9 @@ let rec process_recv_buffer t recv_buffer =
       let obj = Msg.obj msg in
       match Objects.find_opt obj t.objects with
       | None -> Fmt.failwith "No such object %ld" obj
-      | Some (Handler (proxy, handler)) ->
+      | Some (Generic proxy) ->
         Log.info (fun f ->
-            let (module M) = proxy.metadata in
+            let (module M) = proxy.handler.metadata in
             let msg_name, arg_info =
               match t.role with
               | `Client -> M.events (Msg.op msg)
@@ -37,7 +37,7 @@ let rec process_recv_buffer t recv_buffer =
               pp_proxy proxy
               msg_name
               (Msg.pp_args arg_info) msg);
-        handler proxy (Msg.cast msg)
+        proxy.handler.dispatch proxy (Msg.cast msg)
     end;
     Recv_buffer.update_consumer recv_buffer (Msg.length msg);
     (* Fmt.pr "Buffer after dispatch: %a@." Recv_buffer.dump recv_buffer; *)

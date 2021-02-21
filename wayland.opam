@@ -8,6 +8,7 @@ doc: "https://talex5.github.io/ocaml-wayland/"
 bug-reports: "https://github.com/talex5/ocaml-wayland/issues"
 depends: [
   "dune" {>= "2.8"}
+  "alcotest-lwt" {>= "1.2.3" & with-test}
   "ocaml" {>= "4.08.0"}
   "xmlm" {>= "1.3.0"}
   "lwt" {>= "5.4.0"}
