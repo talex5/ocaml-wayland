@@ -10,3 +10,9 @@ class type transport = object
       The data is read into [buffer] and the method returns the number of bytes
       read and the list of attached file descriptors. *)
 end
+
+type 'a user_data = ..
+(** Extra data that can be attached to a proxy of type ['a]. *)
+
+type 'a user_data += No_data
+(** The default user data for a proxy. *)

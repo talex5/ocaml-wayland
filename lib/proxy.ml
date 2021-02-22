@@ -6,6 +6,7 @@ type ('a, 'v) proxy = ('a, 'v) t
 
 module Handler = struct
   type ('a, 'v) t = {
+    user_data : 'a S.user_data;
     metadata : (module Metadata.S);
     handler : ('a, 'v) proxy -> ('a, [`R]) Msg.t -> unit;
   }
@@ -16,7 +17,7 @@ module Handler = struct
 
   let cast_version t = (t :> _ t)
 
-  let v metadata handler = { metadata; handler }
+  let v ?(user_data=S.No_data) metadata handler = { metadata; handler; user_data }
 end
 
 module Service_handler = struct
@@ -31,8 +32,8 @@ module Service_handler = struct
 
   let cast_version t = (t :> _ t)
 
-  let v ~version metadata h =
-    { version; handler = Handler.v metadata h }
+  let v ~version ?user_data metadata h =
+    { version; handler = Handler.v ?user_data metadata h }
 end
 
 let pp = pp_proxy
@@ -62,22 +63,24 @@ let send (t:_ t) (msg : ('a, [`W]) Msg.t) =
   else
     Fmt.failwith "Attempt to use object %a after calling destructor!" pp t
 
-let spawn_bind t {Service_handler.version; handler = { Handler.metadata; handler }} =
+let spawn_bind t {Service_handler.version; handler = { Handler.metadata; handler; user_data}} =
   let conn = t.conn in
   let id = get_unused_id conn in
-  let t' = { id; version; conn = t.conn; valid = true; metadata } in
+  let t' = { id; version; conn = t.conn; valid = true; metadata; user_data } in
   conn.objects <- Objects.add id (Handler (t', handler)) conn.objects;
   t'
 
 let spawn t handler = spawn_bind t {Service_handler.version = t.version; handler}
 
+let user_data (t:_ t) = t.user_data
+
 let invalidate t =
   assert t.valid;
   t.valid <- false
 
-let add_root conn { Service_handler.version; handler = { metadata; handler } } =
+let add_root conn { Service_handler.version; handler = { metadata; handler; user_data } } =
   assert (version = 1l);
-  let display_proxy = { metadata; version; id = 1l; conn; valid = true } in
+  let display_proxy = { metadata; version; id = 1l; conn; valid = true; user_data } in
   conn.objects <- Objects.add display_proxy.id (Handler (display_proxy, handler)) conn.objects;
   display_proxy
 

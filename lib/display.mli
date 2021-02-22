@@ -1,3 +1,5 @@
+(** Client-side connection to Wayland display. *)
+
 type t
 
 val connect : S.transport -> t

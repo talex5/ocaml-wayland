@@ -3,6 +3,10 @@ type ('a, +'v) t
 
 type ('a, 'v) proxy := ('a, 'v) t               (* Alias for use inside this file only *)
 
+val user_data : ('a, _) t -> 'a S.user_data
+(** [user_data t] returns the data attached to the proxy when it was created.
+    Returns [No_data] if nothing was attached. *)
+
 (** {2 Functions for use by generated code}
 
     You should not need to use these functions directly.
@@ -15,12 +19,14 @@ module Handler : sig
       for ['v], which will then be constrained by the [spawn] call. *)
 
   val v :
+    ?user_data:'a S.user_data ->
     (module Metadata.S) ->
     (('a, 'v) proxy -> ('a, [`R]) Msg.t -> unit) ->
     ('a, 'v) t
     (** [v metadata dispatch] is a handler for the interface [metadata],
         which uses [dispatch self msg] to handle incoming messages.
-        Only used by the generated code. *)
+        Only used by the generated code.
+        @param user_data Extra data to be attached to the proxy. *)
 
   val cast_version : ('a, _) t -> ('a, _) t
   (** If the version rules turn out to be too restrictive, this can be used to disable them.
@@ -36,13 +42,15 @@ module Service_handler : sig
 
   val v :
     version:int32 ->
+    ?user_data:'a S.user_data ->
     (module Metadata.S) ->
     (('a, 'v) proxy -> ('a, [`R]) Msg.t -> unit) ->
     ('a, 'v) t
     (** [v ~version metadata dispatch] is a handler for the interface [metadata],
         which uses [dispatch self msg] to handle incoming messages.
         Only used by the generated code.
-        @param version The version to request in the bind call. *)
+        @param version The version to request in the bind call.
+        @param user_data Extra data to be attached to the proxy. *)
 
   val interface : _ t -> string
   (** [interface t] is the interface from [t]'s metadata. *)

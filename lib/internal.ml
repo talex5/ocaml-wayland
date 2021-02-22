@@ -15,6 +15,7 @@ type connection = {
   conn : connection;
   metadata : (module Metadata.S);
   version : int32;
+  user_data : 'a S.user_data;
   mutable valid : bool;
 }
 and generic_handler = Handler : 'a proxy * 'a handler -> generic_handler

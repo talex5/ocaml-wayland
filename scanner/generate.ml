@@ -377,9 +377,9 @@ let make_wrappers ~internal role (protocol : Protocol.t) f =
           group.versions |> List.iter (fun minor_version ->
               let end_group = list_last group.versions in
               if !have_incoming then (
-                line "@[<v2>let v%d (handlers:'v h%d)" minor_version version;
+                line "@[<v2>let v%d ?user_data (handlers:'v h%d)" minor_version version;
               ) else (
-                line "@[<v2>let v%d ()" minor_version;
+                line "@[<v2>let v%d ?user_data ()" minor_version;
               );
               if is_service then (
                 Fmt.pf f " : (_, [> `V%d]) Proxy.Service_handler.t = Proxy.Service_handler.v" minor_version;
@@ -387,6 +387,7 @@ let make_wrappers ~internal role (protocol : Protocol.t) f =
               ) else (
                 Fmt.pf f " : (_, [< %a]) Proxy.Handler.t = Proxy.Handler.v" pp_versions (1, end_group);
               );
+              line "?user_data";
               line "(module %s)" (full_module_name protocol iface);
               if !have_incoming then (
                 line "(_handle_v%d handlers)" version

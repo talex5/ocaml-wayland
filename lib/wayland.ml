@@ -36,7 +36,7 @@ module Wayland_proto = Wayland_proto
 (** {2 Low-level API} *)
 
 module Proxy = Proxy
-(** Low-level operations on objects, used by the generated wrappers. *)
+(** Low-level operations on objects, mostly used by the generated wrappers. *)
 
 module Metadata = Metadata
 (** Describing interfaces. *)
