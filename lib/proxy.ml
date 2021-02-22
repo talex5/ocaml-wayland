@@ -2,27 +2,44 @@ open Internal
 
 type ('a, 'v) t = 'a Internal.proxy
 
-type ('a, 'v, 'vspawn, 'vbind) handler = {
-  metadata : (module Metadata.S);
-  version : int32;
-  handler : ('a, 'v) t -> ('a, [`R]) Msg.t -> unit;
-}
+type ('a, 'v) proxy = ('a, 'v) t
 
-let handler metadata ~version handler = { metadata; version; handler }
+module Handler = struct
+  type ('a, 'v) t = {
+    metadata : (module Metadata.S);
+    handler : ('a, 'v) proxy -> ('a, [`R]) Msg.t -> unit;
+  }
+
+  let interface t =
+    let (module M) = t.metadata in
+    M.interface
+
+  let cast_version t = (t :> _ t)
+
+  let v metadata handler = { metadata; handler }
+end
+
+module Service_handler = struct
+  type ('a, 'v) t = {
+    handler : ('a, 'v) Handler.t;
+    version : int32;
+  }
+
+  let interface t = Handler.interface t.handler
+
+  let version t = t.version
+
+  let cast_version t = (t :> _ t)
+
+  let v ~version metadata h =
+    { version; handler = Handler.v metadata h }
+end
 
 let pp = pp_proxy
 
 let id t =
   assert t.valid;
   t.id
-
-let interface (t:_ t) =
-  let (module M) = t.metadata in
-  M.interface
-
-let version (t : _ t) = t.version
-
-let cast_version x = (x :> _ handler)
 
 let alloc t = Msg.alloc ~obj:t.id
 
@@ -45,26 +62,26 @@ let send (t:_ t) (msg : ('a, [`W]) Msg.t) =
   else
     Fmt.failwith "Attempt to use object %a after calling destructor!" pp t
 
-let spawn_bind t {metadata; version; handler} =
+let spawn_bind t {Service_handler.version; handler = { Handler.metadata; handler }} =
   let conn = t.conn in
   let id = get_unused_id conn in
   let t' = { id; version; conn = t.conn; valid = true; metadata } in
   conn.objects <- Objects.add id (Handler (t', handler)) conn.objects;
   t'
 
-let spawn t handler = spawn_bind t {handler with version = t.version}
+let spawn t handler = spawn_bind t {Service_handler.version = t.version; handler}
 
 let invalidate t =
   assert t.valid;
   t.valid <- false
 
-let add_root conn { metadata; version; handler } =
+let add_root conn { Service_handler.version; handler = { metadata; handler } } =
   assert (version = 1l);
   let display_proxy = { metadata; version; id = 1l; conn; valid = true } in
   conn.objects <- Objects.add display_proxy.id (Handler (display_proxy, handler)) conn.objects;
   display_proxy
 
-let delete proxy id =
+let delete_other proxy id =
   let conn = proxy.conn in
   let old = conn.objects in
   conn.objects <- Objects.remove id conn.objects;
@@ -73,10 +90,3 @@ let delete proxy id =
 
 let unknown_event = Fmt.strf "<unknown event %d>"
 let unknown_request = Fmt.strf "<unknown request %d>"
-
-let handler_interface (h : _ handler) =
-  let (module M) = h.metadata in
-  M.interface
-
-let handler_version (h : _ handler) =
-  h.version

@@ -89,7 +89,7 @@ let pp_args ~with_types =
     | `Object (Some interface) when with_types ->
       Fmt.pf f "(%s:(%a, _) Proxy.t)" m pp_poly interface
     | `New_ID (Some interface) when with_types ->
-      Fmt.pf f "(%s:(%a, 'v, _, _) Proxy.handler)" m pp_poly interface
+      Fmt.pf f "(%s:(%a, 'v) Proxy.Handler.t)" m pp_poly interface
     | _ ->
       Fmt.pf f "%s" m
   in
@@ -160,22 +160,22 @@ let pp_strings f args =
   args
   |> List.filter_map (fun (a : Arg.t) ->
       match a.ty with
-      | `New_ID None -> Some (Fmt.strf "(Proxy.handler_interface %s)" (mangle a.name))
+      | `New_ID None -> Some (Fmt.strf "(Proxy.Service_handler.interface %s)" (mangle a.name))
       | `String -> Some (mangle a.name)
       | _ -> None
     )
   |> Fmt.(list ~sep:semi string) f
 
-let rec root_version ~parents (interface : Interface.t) =
+let rec root_interface ~parents (interface : Interface.t) =
   match Parent.parent parents interface with
-  | None -> interface.version
+  | None -> interface
   | Some parent ->
     if parent.version < interface.version then (
       Fmt.failwith "Interface %S has version %d, which is less that its child %S at %d!"
         parent.name parent.version
         interface.name interface.version
     );
-    root_version ~parents parent
+    root_interface ~parents parent
 
 type version_group = {
   versions : int list;  (* List of identical versions *)
@@ -273,7 +273,9 @@ let make_wrappers ~internal role (protocol : Protocol.t) f =
   );
   line "";
   protocol.interfaces |> List.iter (fun (iface : Interface.t) ->
-      let n_versions = root_version ~parents iface in
+      let root = root_interface ~parents iface in
+      let n_versions = root.version in
+      let is_service = root == iface in
       let versions = get_versions ~n_versions iface in
       line "";
       comment f iface.description;
@@ -314,8 +316,8 @@ let make_wrappers ~internal role (protocol : Protocol.t) f =
                   let m = mangle arg.name in
                   match arg.ty with
                   | `New_ID None ->
-                    line "Msg.add_string _msg (Proxy.handler_interface %s);" m;
-                    line "Msg.add_int _msg (Proxy.handler_version %s);" m;
+                    line "Msg.add_string _msg (Proxy.Service_handler.interface %s);" m;
+                    line "Msg.add_int _msg (Proxy.Service_handler.version %s);" m;
                     line "Msg.add_int _msg (Proxy.id __%s);" m
                   | `New_ID (Some _) ->
                     line "Msg.add_int _msg (Proxy.id __%s);" m
@@ -379,9 +381,13 @@ let make_wrappers ~internal role (protocol : Protocol.t) f =
               ) else (
                 line "@[<v2>let v%d ()" minor_version;
               );
-              Fmt.pf f " : (_, 'v, [< %a], [> `V%d]) Proxy.handler = Proxy.handler" pp_versions (1, end_group) minor_version;
+              if is_service then (
+                Fmt.pf f " : (_, [> `V%d]) Proxy.Service_handler.t = Proxy.Service_handler.v" minor_version;
+                line "~version:%dl" minor_version;
+              ) else (
+                Fmt.pf f " : (_, [< %a]) Proxy.Handler.t = Proxy.Handler.v" pp_versions (1, end_group);
+              );
               line "(module %s)" (full_module_name protocol iface);
-              line "~version:%dl" minor_version;
               if !have_incoming then (
                 line "(_handle_v%d handlers)" version
               ) else (

@@ -38,9 +38,9 @@ let get_exn t interface =
   | [] -> Fmt.failwith "Required interface %S not found in registry!" interface
   | e :: _ -> e
 
-let bind t (handler : _ Proxy.handler) =
-  let iface = Proxy.handler_interface handler in
-  let handler_version = Proxy.handler_version handler in
+let bind t handler =
+  let iface = Proxy.Service_handler.interface handler in
+  let handler_version = Proxy.Service_handler.version handler in
   let {name; version} = get_exn t iface in
   if version < handler_version then
     Fmt.failwith "Can't use version %ld of %s; registry only supports <= %ld" handler_version iface version;

@@ -11,7 +11,7 @@ let connect transport =
         Log.err (fun f -> f "Received Wayland error: %ld %s on object %ld" code message object_id)
 
       method on_delete_id proxy ~id =
-        Proxy.delete proxy id
+        Proxy.delete_other proxy id
     end
   in
   Lwt.async (fun () -> Connection.listen conn);

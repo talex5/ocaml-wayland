@@ -9,10 +9,10 @@ type t = {
 let index_ops t (parent : Interface.t) (msg : Message.t) =
   msg.args |> List.iter (fun (arg : Arg.t) ->
       match arg.ty with
-      | `New_ID (Some "wl_callback") -> ()  (* Seems to be an exception to the tree rule *)
       | `New_ID (Some interface) ->
         Interface_map.find_opt interface t.parent |> Option.iter (fun (other_parent : Interface.t) ->
-            if other_parent.name <> parent.name then (
+            (* wl_callback seems to be an exception to the tree rule *)
+            if other_parent.name <> parent.name && interface <> "wl_callback" then (
               Fmt.pr "WARNING: Interface %S has two creation parents: %S and %S!@."
                 interface parent.name other_parent.name
             )
