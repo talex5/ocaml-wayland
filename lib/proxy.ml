@@ -142,7 +142,7 @@ let delete t =
     conn.objects <- Objects.remove t.id conn.objects;
     Internal.free_id conn t.id;
     let Generic display = Objects.find 1l conn.objects in
-    let msg = alloc display ~op:1 ~ints:1 ~strings:[] in
+    let msg = alloc display ~op:1 ~ints:1 ~strings:[] ~arrays:[] in
     Msg.add_int msg t.id;
     send display msg
   | _ -> Fmt.failwith "Object %a is not registered!" pp t

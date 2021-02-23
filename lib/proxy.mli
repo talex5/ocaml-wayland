@@ -101,9 +101,10 @@ end
 val id : _ t -> int32
 (** [id t] is [t]'s object ID. Use this to refer to the object in a message. *)
 
-val alloc : ('a, _) t -> op:int -> ints:int -> strings:string list -> ('a, [`W]) Msg.t
-(** [alloc t ~op ~ints ~strings] is a fresh message for [t]'s [op] operation.
-    The message is the right size for [ints] integer arguments and all the strings in [strings]. *)
+val alloc : ('a, _) t -> op:int -> ints:int -> strings:string list -> arrays:string list -> ('a, [`W]) Msg.t
+(** [alloc t ~op ~ints ~strings ~arrays] is a fresh message for [t]'s [op] operation.
+    The message is the right size for [ints] integer arguments, all the strings in [strings],
+    and all the arrays in [arrays]. *)
 
 val send : ('a, _) t -> ('a, [`W]) Msg.t -> unit
 (** [send t msg] enqueues [msg] on [t]'s connection. *)

@@ -43,7 +43,7 @@ val get_fixed  : _ t -> Fixed.t
 
 (** {2 Generating messages} *)
 
-val alloc : obj:int32 -> op:int -> ints:int -> strings:string list -> ('a, [`W]) t
+val alloc : obj:int32 -> op:int -> ints:int -> strings:string list -> arrays:string list -> ('a, [`W]) t
 (** See {!Proxy.alloc}. *)
 
 val add_int    : (_, [`W]) t -> int32 -> unit

@@ -70,14 +70,20 @@ let get_fixed t =
 let add_fixed t v =
   add_int t (Fixed.to_bits v)
 
-let alloc ~obj ~op ~ints ~strings =
-  let rec aux acc = function
-    | [] -> acc
-    | s :: ss ->
-      let len = 4 + (String.length s + 4) land -4 in (* Note: includes ['\0'] terminator *)
-      aux (acc + len) ss
-  in
-  let len = aux (8 + ints * 4) strings in
+let rec count_strings acc = function
+  | [] -> acc
+  | s :: ss ->
+    let len = 4 + (String.length s + 4) land -4 in (* Note: includes ['\0'] terminator *)
+    count_strings (acc + len) ss
+
+let rec count_arrays acc = function
+  | [] -> acc
+  | x :: xs ->
+    let len = 4 + (String.length x + 3) land -4 in
+    count_arrays (acc + len) xs
+
+let alloc ~obj ~op ~ints ~strings ~arrays =
+  let len = count_arrays (count_strings (8 + ints * 4) strings) arrays in
   let buffer = Cstruct.create len in
   NE.set_uint32 buffer 0 obj;
   if Sys.big_endian then (

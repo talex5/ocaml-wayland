@@ -167,6 +167,15 @@ let pp_strings f args =
     )
   |> Fmt.(list ~sep:semi string) f
 
+let pp_arrays f args =
+  args
+  |> List.filter_map (fun (a : Arg.t) ->
+      match a.ty with
+      | `Array -> Some (mangle a.name)
+      | _ -> None
+    )
+  |> Fmt.(list ~sep:semi string) f
+
 let rec root_interface ~parents (interface : Interface.t) =
   match Parent.parent parents interface with
   | None -> interface
@@ -312,8 +321,10 @@ let make_wrappers ~internal role (protocol : Protocol.t) f =
                     (match arg.ty with `New_ID None -> "_bind" | _ -> "")
                     m
                 );
-              line "let _msg = Proxy.alloc _t ~op:%d ~ints:%d ~strings:[%a] in"
-                i (List.length msg.args + extra_version_fields) pp_strings msg.args;
+              line "let _msg = Proxy.alloc _t ~op:%d ~ints:%d ~strings:[%a] ~arrays:[%a] in"
+                i (List.length msg.args + extra_version_fields)
+                pp_strings msg.args
+                pp_arrays msg.args;
               msg.args |> List.iter (fun (arg : Arg.t) ->
                   let m = mangle arg.name in
                   match arg.ty with

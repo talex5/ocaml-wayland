@@ -53,6 +53,7 @@ let draw_frame t =
 let () =
   Logs.set_reporter (Logs_fmt.reporter ());
   Logs.(set_level (Some Info));
+  Printexc.record_backtrace true;
   Lwt_main.run begin
     (* Connect to the server. *)
     let* transport = Wayland.Unix_transport.connect () in
