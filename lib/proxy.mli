@@ -15,6 +15,11 @@ val user_data : ('a, _) t -> 'a S.user_data
 (** [user_data t] returns the data attached to the proxy when it was created.
     Returns [No_data] if nothing was attached. *)
 
+val cast_version : ('a, _) t -> ('a, _) t
+(** If the version rules turn out to be too restrictive, this can be used to disable them.
+    Using this incorrectly may lead to a protocol error (such as receiving an event for which
+    no handler was registered). *)
+
 (** {2 Functions for use by generated code}
 
     You should not need to use these functions directly.

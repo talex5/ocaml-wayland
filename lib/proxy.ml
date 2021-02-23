@@ -33,6 +33,8 @@ let complete_accept t handler =
   t.handler <- handler;
   t.valid <- true
 
+let cast_version t = (t : ('a, _) t :> ('a, _) t)
+
 module Handler = struct
   type ('a, 'v) t = 'a Internal.handler
 
