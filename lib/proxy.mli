@@ -15,9 +15,13 @@ val cast_version : ('a, _) t -> ('a, _) t
     Using this incorrectly may lead to a protocol error (such as receiving an event for which
     no handler was registered). *)
 
+val version : _ t -> int32
+
 val metadata : ('a, _) t -> (module Metadata.S with type t = 'a)
 
 val ty : ('a, _) t -> 'a Metadata.ty
+
+val interface : _ t -> string
 
 (** {2 Functions for use by generated code}
 

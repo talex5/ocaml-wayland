@@ -35,11 +35,17 @@ let complete_accept t handler =
 
 let cast_version t = (t : ('a, _) t :> ('a, _) t)
 
+let version t = t.version
+
 let metadata t = t.handler.metadata
 
 let ty (type a) t =
   let (module M : Metadata.S with type t = a) = metadata t in
   M.T
+
+let interface (type a) t =
+  let (module M : Metadata.S with type t = a) = metadata t in
+  M.interface
 
 module Handler = struct
   type ('a, 'v) t = 'a Internal.handler
