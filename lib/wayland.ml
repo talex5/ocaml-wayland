@@ -11,7 +11,7 @@ module Registry = Registry
     It calls [fn data] when the callback's "done" signal is received.
     Wl_callback seems to be an exception to the usual Wayland versioning rules
     (a wl_callback can be created by multiple objects). *)
-let callback fn : ([ `Wl_callback ], [> `V1]) Proxy.Handler.t =
+let callback fn : ([ `Wl_callback ], [> ]) Proxy.Handler.t =
   Proxy.Handler.cast_version @@ Wayland_client.Wl_callback.v1 @@ object
     method on_done _ ~callback_data = fn callback_data
   end
