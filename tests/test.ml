@@ -79,11 +79,13 @@ module S = struct
     let _ : Server.t =
       Server.connect socket (fun reg ->
           Proxy.Handler.attach reg @@ Wl_registry.v1 @@ object
-            method on_bind _ ~name = function
-              | Proxy.Proxy (Wayland_proto.Wl_compositor.T, proxy) ->
+            method on_bind : type a. _ -> name:int32 -> (a, [`Unknown]) Proxy.t -> unit =
+              fun _ ~name proxy ->
+              match Proxy.ty proxy with
+              | Wayland_proto.Wl_compositor.T ->
                 assert (name = comp_name);
                 make_compositor t proxy
-              | Proxy (_, proxy) -> Fmt.failwith "Invalid service name for %a" Proxy.pp proxy
+              | _ -> Fmt.failwith "Invalid service name for %a" Proxy.pp proxy
           end;
           Wl_registry.global reg ~name:comp_name ~interface:"wl_compositor" ~version:1l
         )

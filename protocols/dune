@@ -6,4 +6,4 @@
 (rule
  (targets xdg_shell_client.ml xdg_shell_server.ml xdg_shell_proto.ml)
  (deps   xdg-shell.xml)
- (action (run %{bin:wayland-scanner-ocaml} %{deps})))
+ (action (run %{bin:wayland-scanner-ocaml} --open Wayland.Wayland_proto %{deps})))

@@ -1,3 +1,5 @@
+type 'a ty = ..
+
 type param = [
   | `Uint 
   | `Int 
@@ -16,6 +18,9 @@ type info = int -> string * arg list
 (** A function that takes an operation number and returns the operation name and argument metadata. *)
 
 module type S = sig
+  type t
+  type _ ty += T : t ty
+
   val interface : string
   val requests : info
   val events : info

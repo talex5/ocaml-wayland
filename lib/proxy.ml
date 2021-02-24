@@ -4,12 +4,12 @@ type ('a, 'v) t = 'a Internal.proxy
 
 type ('a, 'v) proxy = ('a, 'v) t
 
-type generic = Proxy : 'a Iface_reg.ty * ('a, [`Unknown]) t -> generic
+type 'v generic = Proxy : ('a, 'v) t -> 'v generic
 
 let missing_dispatch _ = failwith "no handler registered!"
 
-let missing_handler = {
-  metadata = (module Iface_reg.Unknown);
+let missing_handler metadata = {
+  metadata;
   user_data = S.No_data;
   dispatch = missing_dispatch;
 }
@@ -35,23 +35,31 @@ let complete_accept t handler =
 
 let cast_version t = (t : ('a, _) t :> ('a, _) t)
 
+let metadata t = t.handler.metadata
+
+let ty (type a) t =
+  let (module M : Metadata.S with type t = a) = metadata t in
+  M.T
+
 module Handler = struct
   type ('a, 'v) t = 'a Internal.handler
 
-  let interface t =
-    let (module M) = t.metadata in
+  let interface (type a) t =
+    let (module M : Metadata.S with type t = a) = t.metadata in
     M.interface
 
   let cast_version t = (t :> _ t)
 
   let v ?(user_data=S.No_data) metadata dispatch = { metadata; dispatch; user_data }
 
-  let accept_new proxy id =
-    accept_new proxy id ~version:proxy.version ~handler:missing_handler
+  let accept_new (type a) proxy (module M : Metadata.S with type t = a) id =
+    accept_new proxy id ~version:proxy.version ~handler:(missing_handler (module M))
 
   let attach proxy handler =
     complete_accept proxy handler
 end
+
+let pp = pp_proxy
 
 module Service_handler = struct
   type ('a, 'v) t = {
@@ -68,24 +76,15 @@ module Service_handler = struct
   let v ~version ?user_data metadata h =
     { version; handler = Handler.v ?user_data metadata h }
 
-  let accept_new proxy id ~interface ~version =
-    let Iface_reg.Interface (ty, (module M : Metadata.S)) = interface in
-    let handler = { metadata = (module M); user_data = S.No_data; dispatch = missing_dispatch } in
-    let proxy' = accept_new proxy ~version ~handler id in
-    Proxy (ty, proxy')
+  let accept_new (type a) proxy id (module M : Metadata.S with type t = a) ~version : (a, [`Unknown]) proxy =
+    accept_new proxy id ~version ~handler:(missing_handler (module M))
 
-  let attach (proxy : ('a, _) proxy) { handler; version } =
-    let (module M1) = proxy.handler.metadata in
-    let (module M2) = handler.metadata in
-    if M1.interface <> M2.interface then
-      Fmt.invalid_arg "attach: expected interface %S, but got a handler for %S" M1.interface M2.interface;
+  let attach (type a) (proxy : (a, _) proxy) { handler; version } =
     if proxy.version <> version then
-      Fmt.invalid_arg "attach: expected %S to have version %ld, but got a handler for %ld" M1.interface proxy.version version;
+      Fmt.invalid_arg "attach: expected %a to have version %ld, but got a handler for %ld" pp proxy proxy.version version;
     complete_accept proxy handler;
-    (proxy :> ('a, _) proxy)
+    proxy
 end
-
-let pp = pp_proxy
 
 let id t =
   assert t.valid;
@@ -93,9 +92,9 @@ let id t =
 
 let alloc t = Msg.alloc ~obj:t.id
 
-let send (t:_ t) (msg : ('a, [`W]) Msg.t) =
+let send (type a) (t:_ t) (msg : (a, [`W]) Msg.t) =
   Log.info (fun f ->
-      let (module M) = t.handler.metadata in
+      let (module M : Metadata.S with type t = a) = t.handler.metadata in
       let outgoing_info =
         match t.conn.role with
         | `Client -> M.requests
@@ -157,12 +156,10 @@ let delete_other proxy id =
 let unknown_event = Fmt.strf "<unknown event %d>"
 let unknown_request = Fmt.strf "<unknown request %d>"
 
-let lookup_other_unsafe ~interface (t : ('a, _) t) id : ('b, _) t =
+let lookup_other (t : _ t) id =
   match Objects.find_opt id t.conn.objects with
   | None -> Fmt.failwith "Proxy with ID %ld not found!" id
-  | Some (Generic p) ->
-    let (module M) = p.handler.metadata in
-    if M.interface <> interface then
-      Fmt.failwith "Object %a referenced object %a, which should be of type %S but isn't'" pp t pp p interface;
-    (* If the interfaces are the same then the type must be too, because it's generated directly from the name. *)
-    (Obj.magic p : _ t)
+  | Some (Generic p) -> Proxy p
+
+let wrong_type ~parent ~expected t =
+  Fmt.failwith "Object %a referenced object %a, which should be of type %S but isn't'" pp parent pp t expected

@@ -3,9 +3,8 @@ type ('a, +'v) t
 
 type ('a, 'v) proxy := ('a, 'v) t               (* Alias for use inside this file only *)
 
-type generic = Proxy : 'a Iface_reg.ty * ('a, [`Unknown]) t -> generic
-(** A proxy with its type metadata.
-    Pattern match on the type metadata to discover the proxy's type. *)
+type 'v generic = Proxy : ('a, 'v) t -> 'v generic
+(** A proxy whose type isn't known statically. Use {!ty} and pattern matching to recover the type. *)
 
 val delete : _ t -> unit
 (** [delete t] sends a delete event from object 1 and removes [t] from the
@@ -20,6 +19,10 @@ val cast_version : ('a, _) t -> ('a, _) t
     Using this incorrectly may lead to a protocol error (such as receiving an event for which
     no handler was registered). *)
 
+val metadata : ('a, _) t -> (module Metadata.S with type t = 'a)
+
+val ty : ('a, _) t -> 'a Metadata.ty
+
 (** {2 Functions for use by generated code}
 
     You should not need to use these functions directly.
@@ -33,7 +36,7 @@ module Handler : sig
 
   val v :
     ?user_data:'a S.user_data ->
-    (module Metadata.S) ->
+    (module Metadata.S with type t = 'a) ->
     (('a, 'v) proxy -> ('a, [`R]) Msg.t -> unit) ->
     ('a, 'v) t
     (** [v metadata dispatch] is a handler for the interface [metadata],
@@ -46,7 +49,7 @@ module Handler : sig
       Using this incorrectly may lead to a protocol error (such as receiving an event for which
       no handler was registered). *)
 
-  val accept_new : (_, 'v) proxy -> int32 -> ('a, 'v) proxy
+  val accept_new : (_, 'v) proxy -> (module Metadata.S with type t = 'a) -> int32 -> ('a, 'v) proxy
   (** [accept_new parent id] registers a new object, with an ID allocated by the peer.
       The resulting proxy is in a half-initialised state.
       You must call {!attach} on it before switching threads or doing anything else with it. *)
@@ -65,7 +68,7 @@ module Service_handler : sig
   val v :
     version:int32 ->
     ?user_data:'a S.user_data ->
-    (module Metadata.S) ->
+    (module Metadata.S with type t = 'a) ->
     (('a, 'v) proxy -> ('a, [`R]) Msg.t -> unit) ->
     ('a, 'v) t
     (** [v ~version metadata dispatch] is a handler for the interface [metadata],
@@ -85,8 +88,8 @@ module Service_handler : sig
       Using this incorrectly may lead to a protocol error (such as receiving an event for which
       no handler was registered). *)
 
-  val accept_new : (_, 'v) proxy -> int32 -> interface:Iface_reg.interface -> version:int32 -> generic
-  (** [accept_new parent id ~interface ~version] registers a new object,
+  val accept_new : (_, 'v) proxy -> int32 -> (module Metadata.S with type t = 'a) -> version:int32 -> ('a, [`Unknown]) proxy
+  (** [accept_new parent id metadata ~version] registers a new object,
       with an ID allocated by the peer.
       The returned proxy must have its handlers attached before switching threads,
       since otherwise processing a message addressed to the new object will fail.
@@ -140,9 +143,9 @@ val add_root : Internal.connection -> ('a, 'v) Service_handler.t -> ('a, 'v) t
 val delete_other : _ t -> int32 -> unit
 (** [delete_other proxy id] removes [id] from [proxy]'s connection. Internal use only. *)
 
-val lookup_other_unsafe : interface:string -> (_, 'v) t -> int32 -> (_, 'v) t
-(** [lookup_other ~interface parent id] returns the proxy with [id] in [parent]'s connection.
-    It assumes the child proxy has the same version.
-    You MUST cast the result to the type [`Interface] (the equivalent of [interface]).
-    @param interface Used to check that the object has the expected type, since the other end
-                     could send us an invalid ID. *)
+val lookup_other : _ t -> int32 -> _ generic
+(** [lookup_other parent id] returns the proxy with [id] in [parent]'s connection.
+    Raises an exception if the object doesn't exist. *)
+
+val wrong_type : parent:_ t -> expected:string -> _ t -> 'a
+(** [wrong_type ~parent ~expected t] fails with an exception complaining that [t] should have type [expected]. *)

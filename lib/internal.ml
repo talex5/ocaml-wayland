@@ -20,7 +20,7 @@ type connection = {
 and generic_proxy = Generic : 'a proxy -> generic_proxy
 and 'a handler = {
   user_data : 'a S.user_data;
-  metadata : (module Metadata.S);
+  metadata : (module Metadata.S with type t = 'a);
   dispatch : 'a proxy -> ('a, [`R]) Msg.t -> unit;
 }
 
@@ -59,6 +59,6 @@ let enqueue t buf =
   Queue.add buf t.outbox;
   if start_transmit_thread then Lwt.async (fun () -> transmit t)
 
-let pp_proxy f (x: _ proxy) =
-  let (module M) = x.handler.metadata in
+let pp_proxy f (type a) (x: a proxy) =
+  let (module M : Metadata.S with type t = a) = x.handler.metadata in
   Fmt.pf f "%s@%ld" M.interface x.id
