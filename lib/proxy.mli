@@ -1,25 +1,25 @@
-type ('a, +'v) t
-(** An [('a, 'v) t] sends messages to an object with interface ['a] and version in ['v]. *)
+type ('a, +'v, 'role) t
+(** An [('a, 'v, 'role) t] is a proxy used by ['role] to send messages to an object with interface ['a] and version in ['v]. *)
 
-type ('a, 'v) proxy := ('a, 'v) t               (* Alias for use inside this file only *)
+type ('a, 'v, 'role) proxy := ('a, 'v, 'role) t               (* Alias for use inside this file only *)
 
-type 'v generic = Proxy : ('a, 'v) t -> 'v generic
+type ('v, 'role) generic = Proxy : ('a, 'v, 'role) t -> ('v, 'role) generic
 (** A proxy whose type isn't known statically. Use {!ty} and pattern matching to recover the type. *)
 
-val user_data : ('a, _) t -> 'a S.user_data
+val user_data : ('a, _, 'role) t -> ('a, 'role) S.user_data
 (** [user_data t] returns the data attached to the proxy when it was created.
     Returns [No_data] if nothing was attached. *)
 
-val cast_version : ('a, _) t -> ('a, _) t
+val cast_version : ('a, _, 'role) t -> ('a, _, 'role) t
 (** If the version rules turn out to be too restrictive, this can be used to disable them.
     Using this incorrectly may lead to a protocol error (such as receiving an event for which
     no handler was registered). *)
 
 val version : _ t -> int32
 
-val metadata : ('a, _) t -> (module Metadata.S with type t = 'a)
+val metadata : ('a, _, 'role) t -> (module Metadata.S with type t = 'a)
 
-val ty : ('a, _) t -> 'a Metadata.ty
+val ty : ('a, _, 'role) t -> 'a Metadata.ty
 
 val interface : _ t -> string
 
@@ -29,48 +29,51 @@ val interface : _ t -> string
     Instead, run wayland-scanner-ocaml to generate typed wrappers and use the wrappers instead. *)
 
 module Handler : sig
-  type ('a, 'v) t
+  type ('a, 'v, 'role) t
   (** An [('a, 'v) t] handles incoming messages for an object of type ['a].
       Typically, a constructor will let the user pick from a range of versions
       for ['v], which will then be constrained by the [spawn] call. *)
 
   val v :
-    ?user_data:'a S.user_data ->
+    ?user_data:('a, 'role) S.user_data ->
     (module Metadata.S with type t = 'a) ->
-    (('a, 'v) proxy -> ('a, [`R]) Msg.t -> unit) ->
-    ('a, 'v) t
+    (('a, 'v, 'role) proxy -> ('a, [`R]) Msg.t -> unit) ->
+    ('a, 'v, 'role) t
     (** [v metadata dispatch] is a handler for the interface [metadata],
         which uses [dispatch self msg] to handle incoming messages.
         Only used by the generated code.
         @param user_data Extra data to be attached to the proxy. *)
 
-  val cast_version : ('a, _) t -> ('a, _) t
+  val cast_version : ('a, _, 'role) t -> ('a, _, 'role) t
   (** If the version rules turn out to be too restrictive, this can be used to disable them.
       Using this incorrectly may lead to a protocol error (such as receiving an event for which
       no handler was registered). *)
 
-  val accept_new : (_, 'v) proxy -> (module Metadata.S with type t = 'a) -> int32 -> ('a, 'v) proxy
+  val accept_new :
+    (_, 'v, [< `Client | `Server ] as 'role) proxy ->
+    (module Metadata.S with type t = 'a) ->
+    int32 -> ('a, 'v, 'role) proxy
   (** [accept_new parent id] registers a new object, with an ID allocated by the peer.
       The resulting proxy is in a half-initialised state.
       You must call {!attach} on it before switching threads or doing anything else with it. *)
 
-  val attach : ('a, 'v) proxy -> ('a, 'v) t -> unit
+  val attach : ('a, 'v, 'role) proxy -> ('a, 'v, 'role) t -> unit
   (** [attach proxy t] sets [t] as the handler for [proxy],
       which must be a partly initialised proxy returned by [accept_new]. *)
 end
 
 module Service_handler : sig
-  type ('a, 'v) t
+  type ('a, 'v, 'role) t
   (** An [('a, 'v) t] handles incoming messages for a service object of type ['a].
       The difference between services and other objects is that a service gets its version at runtime
       from the bind request, whereas other objects inherit their version from their parent. *)
 
   val v :
     version:int32 ->
-    ?user_data:'a S.user_data ->
+    ?user_data:('a, 'role) S.user_data ->
     (module Metadata.S with type t = 'a) ->
-    (('a, 'v) proxy -> ('a, [`R]) Msg.t -> unit) ->
-    ('a, 'v) t
+    (('a, 'v, 'role) proxy -> ('a, [`R]) Msg.t -> unit) ->
+    ('a, 'v, 'role) t
     (** [v ~version metadata dispatch] is a handler for the interface [metadata],
         which uses [dispatch self msg] to handle incoming messages.
         Only used by the generated code.
@@ -83,19 +86,23 @@ module Service_handler : sig
   val version : _ t -> int32
   (** [version t] is the version from [t]. *)
 
-  val cast_version : ('a, _) t -> ('a, _) t
+  val cast_version : ('a, _, 'role) t -> ('a, _, 'role) t
   (** If the version rules turn out to be too restrictive, this can be used to disable them.
       Using this incorrectly may lead to a protocol error (such as receiving an event for which
       no handler was registered). *)
 
-  val accept_new : (_, 'v) proxy -> int32 -> (module Metadata.S with type t = 'a) -> version:int32 -> ('a, [`Unknown]) proxy
+  val accept_new :
+    (_, 'v, [< `Client | `Server ] as 'role) proxy -> int32 ->
+    (module Metadata.S with type t = 'a) ->
+    version:int32 ->
+    ('a, [`Unknown], 'role) proxy
   (** [accept_new parent id metadata ~version] registers a new object,
       with an ID allocated by the peer.
       The returned proxy must have its handlers attached before switching threads,
       since otherwise processing a message addressed to the new object will fail.
       This is called from the generated code; the user code then calls the result. *)
 
-  val attach : ('a, [`Unknown]) proxy -> ('a, 'v) t -> ('a, 'v) proxy
+  val attach : ('a, [`Unknown], 'role) proxy -> ('a, 'v, 'role) t -> ('a, 'v, 'role) proxy
   (** [attach proxy t] sets [t] as the handler for [proxy],
       which must be a partly initialised proxy returned by [accept_new].
       It returns the proxy with its version cast to the handler's version. *)
@@ -104,19 +111,19 @@ end
 val id : _ t -> int32
 (** [id t] is [t]'s object ID. Use this to refer to the object in a message. *)
 
-val alloc : ('a, _) t -> op:int -> ints:int -> strings:string list -> arrays:string list -> ('a, [`W]) Msg.t
+val alloc : ('a, _, _) t -> op:int -> ints:int -> strings:string list -> arrays:string list -> ('a, [`W]) Msg.t
 (** [alloc t ~op ~ints ~strings ~arrays] is a fresh message for [t]'s [op] operation.
     The message is the right size for [ints] integer arguments, all the strings in [strings],
     and all the arrays in [arrays]. *)
 
-val send : ('a, _) t -> ('a, [`W]) Msg.t -> unit
+val send : ('a, _, [< `Client | `Server ]) t -> ('a, [`W]) Msg.t -> unit
 (** [send t msg] enqueues [msg] on [t]'s connection. *)
 
-val spawn : (_, 'v) t -> ('a, 'v) Handler.t -> ('a, 'v) t
+val spawn : (_, 'v, 'role) t -> ('a, 'v, 'role) Handler.t -> ('a, 'v, 'role) t
 (** Create a new proxy on [t]'s connection with an unused ID.
     The new object has the same version as its parent. *)
 
-val spawn_bind : _ t -> ('a, 'v) Service_handler.t -> ('a, 'v) t
+val spawn_bind : (_, _, 'role) t -> ('a, 'v, 'role) Service_handler.t -> ('a, 'v, 'role) t
 (** Like [spawn] but the child's version is taken from the handler,
     not inherited from the parent.
     This is used for binding with the global registry. *)
@@ -133,7 +140,7 @@ val unknown_event : int -> string
 val unknown_request : int -> string
 (** A suitable string to display for an unknown request number. *)
 
-val delete : _ t -> unit
+val delete : (_, _, [`Server]) t -> unit
 (** [delete t] sends a delete event from object 1 and removes [t] from the
     object table. This is only used in server code, and is called automatically
     by the generated code when receiving a destructor request. *)
@@ -142,13 +149,13 @@ val pp : _ t Fmt.t
 
 (**/**)
 
-val add_root : Internal.connection -> ('a, 'v) Service_handler.t -> ('a, 'v) t
+val add_root : 'role Internal.connection -> ('a, 'v, 'role) Service_handler.t -> ('a, 'v, 'role) t
 (** [add_root conn h] sets [h] as the handler for object 1. *)
 
-val delete_other : _ t -> int32 -> unit
+val delete_other : (_, _, [`Client]) t -> int32 -> unit
 (** [delete_other proxy id] removes [id] from [proxy]'s connection. Internal use only. *)
 
-val lookup_other : _ t -> int32 -> _ generic
+val lookup_other : (_, _, 'role) t -> int32 -> (_, 'role) generic
 (** [lookup_other parent id] returns the proxy with [id] in [parent]'s connection.
     Raises an exception if the object doesn't exist. *)
 

@@ -23,6 +23,10 @@ let mangle name =
   | "done" -> name ^ "_"
   | x -> x
 
+let pp_role f = function
+  | `Client -> Fmt.string f "[`Client]"
+  | `Server -> Fmt.string f "[`Server]"
+
 let pp_poly f name =
   Fmt.pf f "[`%s]" (String.capitalize_ascii (mangle name))
 
@@ -50,7 +54,7 @@ let pp_tvars f = function
     done;
     Fmt.string f ". "
 
-let pp_type ~next_tvar proto iface f (arg:Arg.t) =
+let pp_type ~role ~next_tvar proto iface f (arg:Arg.t) =
   match arg.ty with
   | `Uint | `Int when arg.enum <> None -> Fmt.pf f "%a.t" (pp_enum_module proto iface) arg
   | `Uint | `Int -> Fmt.string f "int32"
@@ -60,9 +64,9 @@ let pp_type ~next_tvar proto iface f (arg:Arg.t) =
   | `New_ID None ->
     let t = !next_tvar in
     next_tvar := t + 1;
-    Fmt.pf f "('x%d, [`Unknown]) Proxy.t" t
+    Fmt.pf f "('x%d, [`Unknown], %a) Proxy.t" t pp_role role
   | `Object (Some i)
-  | `New_ID (Some i) -> Fmt.pf f "(%a, 'v) Proxy.t" pp_poly i
+  | `New_ID (Some i) -> Fmt.pf f "(%a, 'v, %a) Proxy.t" pp_poly i pp_role role
   | `Fixed -> Fmt.string f "Fixed.t"
   | `FD -> Fmt.string f "Unix.file_descr"
 
@@ -84,25 +88,25 @@ let named_argument (arg : Arg.t) =
   | `Object _ -> arg.name <> "id"
   | _ -> true
 
-let pp_arg ~next_tvar proto iface f arg =
+let pp_arg ~role ~next_tvar proto iface f arg =
   if named_argument arg then
-    Fmt.pf f "%s:%a" (mangle arg.name) (pp_type ~next_tvar proto iface) arg
+    Fmt.pf f "%s:%a" (mangle arg.name) (pp_type ~role ~next_tvar proto iface) arg
   else
-    pp_type ~next_tvar proto iface f arg
+    pp_type ~role ~next_tvar proto iface f arg
 
-let pp_sig ~next_tvar proto iface f = function
+let pp_sig ~role ~next_tvar proto iface f = function
   | [] -> Fmt.string f "unit"
-  | args -> Fmt.(list ~sep:(unit " ->@ ") (pp_arg ~next_tvar proto iface) ++ any " ->@ unit") f args
+  | args -> Fmt.(list ~sep:(unit " ->@ ") (pp_arg ~role ~next_tvar proto iface) ++ any " ->@ unit") f args
 
-let pp_args ~with_types =
+let pp_args ~role ~with_types =
   let pp_arg f arg =
     if named_argument arg then Fmt.string f "~";
     let m = mangle arg.name in
     match arg.ty with
     | `Object (Some interface) when with_types ->
-      Fmt.pf f "(%s:(%a, _) Proxy.t)" m pp_poly interface
+      Fmt.pf f "(%s:(%a, _, %a) Proxy.t)" m pp_poly interface pp_role role
     | `New_ID (Some interface) when with_types ->
-      Fmt.pf f "(%s:(%a, 'v) Proxy.Handler.t)" m pp_poly interface
+      Fmt.pf f "(%s:(%a, 'v, %a) Proxy.Handler.t)" m pp_poly interface pp_role role
     | _ ->
       Fmt.pf f "%s" m
   in
@@ -308,7 +312,7 @@ let make_wrappers ~opens ~internal role (protocol : Protocol.t) f =
       line "";
       comment f iface.description;
       line "@[<v2>module %s = struct" (module_name iface.name);
-      line "type 'v t = (%a, 'v) Proxy.t" pp_poly iface.name;
+      line "type 'v t = (%a, 'v, %a) Proxy.t" pp_poly iface.name pp_role role;
       Fmt.list (pp_enum_link protocol iface) f iface.enums;
       let prev_version = ref 0 in
       let have_incoming = ref false in
@@ -330,7 +334,8 @@ let make_wrappers ~opens ~internal role (protocol : Protocol.t) f =
               in
               line "";
               comment f msg.description;
-              line "@[<v2>let %s (_t:([< %a] as 'v) t) @[<h>%a@] =" (mangle msg.name) pp_versions (msg.since, n_versions) (pp_args ~with_types:true) msg.args;
+              line "@[<v2>let %s (_t:([< %a] as 'v) t) @[<h>%a@] ="
+                (mangle msg.name) pp_versions (msg.since, n_versions) (pp_args ~role ~with_types:true) msg.args;
               new_ids |> List.iter (fun (arg : Arg.t) ->
                   let m = mangle arg.name in
                   line "let __%s = Proxy.spawn%s _t %s in"
@@ -377,7 +382,7 @@ let make_wrappers ~opens ~internal role (protocol : Protocol.t) f =
           line "";
           msgs_in |> List.iter (fun (_, (msg : Message.t)) ->
               let next_tvar = ref 0 in
-              let args = Fmt.strf "@[%a@]" (pp_sig ~next_tvar protocol iface) msg.args in
+              let args = Fmt.strf "@[%a@]" (pp_sig ~role ~next_tvar protocol iface) msg.args in
               line "method virtual on_%s : @[%a@]%s %s"
                 msg.name pp_tvars !next_tvar
                 (if msg.ty = `Normal then "'v t ->" else "")
@@ -404,11 +409,11 @@ let make_wrappers ~opens ~internal role (protocol : Protocol.t) f =
                       line "let id = Msg.get_int _msg in";
                       line "Proxy.Service_handler.accept_new _proxy id (module M%d) ~version@]@,in" i;
                     | `New_ID (Some i) ->
-                      line "@[<v2>let %s : (%a, _) Proxy.t =@ Msg.get_int _msg |> Proxy.Handler.accept_new _proxy (module Imports.%s) in@]"
+                      line "@[<v2>let %s : (%a, _, _) Proxy.t =@ Msg.get_int _msg |> Proxy.Handler.accept_new _proxy (module Imports.%s) in@]"
                         m pp_poly i
                         (module_name i)
                     | `Object (Some i) ->
-                      line "@[<v2>let %s : (%a, _) Proxy.t =" m pp_poly i;
+                      line "@[<v2>let %s : (%a, _, _) Proxy.t =" m pp_poly i;
                       line "let Proxy.Proxy p = Msg.get_int _msg |> Proxy.lookup_other _proxy in";
                       line "match Proxy.ty p with";
                       line "| Imports.%s.T -> p" (module_name i);
@@ -422,7 +427,7 @@ let make_wrappers ~opens ~internal role (protocol : Protocol.t) f =
               line "_handlers#on_%s %s@[%a@]@]"
                 msg.name
                 (if msg.ty = `Normal then "_proxy " else "")
-                (pp_args ~with_types:false) msg.args;
+                (pp_args ~role ~with_types:false) msg.args;
             );
           if version > 1 then
             line "| _ -> _handle_v%d _handlers _proxy _msg@]" !prev_version
@@ -438,10 +443,12 @@ let make_wrappers ~opens ~internal role (protocol : Protocol.t) f =
                 line "@[<v2>let v%d ?user_data ()" minor_version;
               );
               if is_service then (
-                Fmt.pf f " : (%a, [> `V%d]) Proxy.Service_handler.t = Proxy.Service_handler.v" pp_poly iface.name minor_version;
+                Fmt.pf f " : (%a, [> `V%d], %a) Proxy.Service_handler.t = Proxy.Service_handler.v"
+                  pp_poly iface.name minor_version pp_role role;
                 line "~version:%dl" minor_version;
               ) else (
-                Fmt.pf f " : (%a, [< %a]) Proxy.Handler.t = Proxy.Handler.v" pp_poly iface.name pp_versions (1, end_group);
+                Fmt.pf f " : (%a, [< %a], %a) Proxy.Handler.t = Proxy.Handler.v"
+                  pp_poly iface.name pp_versions (1, end_group) pp_role role;
               );
               line "?user_data";
               line "(module %s)" (full_module_name protocol iface);

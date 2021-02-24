@@ -2,26 +2,26 @@ open Lwt.Syntax
 
 module Objects = Map.Make(Int32)
 
-type connection = {
+type 'role connection = {
   transport : S.transport;
-  role : [`Client | `Server];
-  mutable objects : generic_proxy Objects.t;
+  role : 'role;
+  mutable objects : 'role generic_proxy Objects.t;
   mutable free_ids : int32 list;
   mutable next_id : int32;
   incoming_fds : Unix.file_descr Queue.t;
   outbox : (unit, [`W]) Msg.t Queue.t;   (* The transmit thread is running whenever this is non-empty. *)
-} and 'a proxy = {
+} and ('a, 'role) proxy = {
   id : int32;
-  conn : connection;
+  conn : 'role connection;
   version : int32;
-  mutable handler : 'a handler;
+  mutable handler : ('a, 'role) handler;
   mutable valid : bool;
 }
-and generic_proxy = Generic : 'a proxy -> generic_proxy
-and 'a handler = {
-  user_data : 'a S.user_data;
+and 'role generic_proxy = Generic : ('a, 'role) proxy -> 'role generic_proxy
+and ('a, 'role) handler = {
+  user_data : ('a, 'role) S.user_data;
   metadata : (module Metadata.S with type t = 'a);
-  dispatch : 'a proxy -> ('a, [`R]) Msg.t -> unit;
+  dispatch : ('a, 'role) proxy -> ('a, [`R]) Msg.t -> unit;
 }
 
 let get_unused_id t =
@@ -59,6 +59,6 @@ let enqueue t buf =
   Queue.add buf t.outbox;
   if start_transmit_thread then Lwt.async (fun () -> transmit t)
 
-let pp_proxy f (type a) (x: a proxy) =
+let pp_proxy f (type a) (x: (a, _) proxy) =
   let (module M : Metadata.S with type t = a) = x.handler.metadata in
   Fmt.pf f "%s@%ld" M.interface x.id

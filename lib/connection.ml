@@ -1,20 +1,20 @@
 open Lwt.Syntax
 open Internal
 
-type t = Internal.connection
+type 'a t = 'a Internal.connection
 
 let connect role transport handler =
-    let t = {
-      transport;
-      role;
-      objects = Objects.empty;
-      free_ids = [];
-      next_id = 2l;
-      incoming_fds = Queue.create ();
-      outbox = Queue.create ();
-    } in
-    let display_proxy = Proxy.add_root t handler in
-    (t, display_proxy)
+  let t = {
+    transport;
+    role;
+    objects = Objects.empty;
+    free_ids = [];
+    next_id = 2l;
+    incoming_fds = Queue.create ();
+    outbox = Queue.create ();
+  } in
+  let display_proxy = Proxy.add_root t handler in
+  (t, display_proxy)
 
 (* Dispatch all complete messages in [recv_buffer]. *)
 let rec process_recv_buffer t recv_buffer =

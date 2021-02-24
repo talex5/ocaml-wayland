@@ -1,10 +1,10 @@
 open Internal
 
-type ('a, 'v) t = 'a Internal.proxy
+type ('a, 'v, 'role) t = ('a, 'role) Internal.proxy
 
-type ('a, 'v) proxy = ('a, 'v) t
+type ('a, 'v, 'role) proxy = ('a, 'v, 'role) t
 
-type 'v generic = Proxy : ('a, 'v) t -> 'v generic
+type ('v, 'role) generic = Proxy : ('a, 'v, 'role) t -> ('v, 'role) generic
 
 let missing_dispatch _ = failwith "no handler registered!"
 
@@ -19,8 +19,10 @@ let missing_handler metadata = {
 let accept_new t ~version ~handler id =
   let conn = t.conn in
   let is_service_allocated_id = (Int32.unsigned_compare id 0xFF000000l >= 0) in
-  if conn.role = `Client then assert is_service_allocated_id
-  else assert (not is_service_allocated_id);
+  begin match conn.role with
+    | `Client -> assert is_service_allocated_id
+    | `Server -> assert (not is_service_allocated_id)
+  end;
   if Objects.mem id conn.objects then
     Fmt.failwith "An object with ID %ld already exists!" id;
   let t' = { id; version; conn; valid = false; handler } in
@@ -33,7 +35,7 @@ let complete_accept t handler =
   t.handler <- handler;
   t.valid <- true
 
-let cast_version t = (t : ('a, _) t :> ('a, _) t)
+let cast_version t = (t : ('a, _, 'role) t :> ('a, _, 'role) t)
 
 let version t = t.version
 
@@ -48,7 +50,7 @@ let interface (type a) t =
   M.interface
 
 module Handler = struct
-  type ('a, 'v) t = 'a Internal.handler
+  type ('a, 'v, 'role) t = ('a, 'role) Internal.handler
 
   let interface (type a) t =
     let (module M : Metadata.S with type t = a) = t.metadata in
@@ -68,8 +70,8 @@ end
 let pp = pp_proxy
 
 module Service_handler = struct
-  type ('a, 'v) t = {
-    handler : ('a, 'v) Handler.t;
+  type ('a, 'v, 'role) t = {
+    handler : ('a, 'v, 'role) Handler.t;
     version : int32;
   }
 
@@ -82,10 +84,10 @@ module Service_handler = struct
   let v ~version ?user_data metadata h =
     { version; handler = Handler.v ?user_data metadata h }
 
-  let accept_new (type a) proxy id (module M : Metadata.S with type t = a) ~version : (a, [`Unknown]) proxy =
+  let accept_new (type a) proxy id (module M : Metadata.S with type t = a) ~version : (a, [`Unknown], _) proxy =
     accept_new proxy id ~version ~handler:(missing_handler (module M))
 
-  let attach (type a) (proxy : (a, _) proxy) { handler; version } =
+  let attach (type a) (proxy : (a, _, _) proxy) { handler; version } =
     if proxy.version <> version then
       Fmt.invalid_arg "attach: expected %a to have version %ld, but got a handler for %ld" pp proxy proxy.version version;
     complete_accept proxy handler;

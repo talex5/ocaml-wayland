@@ -17,7 +17,7 @@ val get : t -> string -> entry list
 val get_exn : t -> string -> entry
 (** [get_exn interface] returns the first entry for [interface], or raises an exception if its not present. *)
 
-val bind : t -> (('a, 'v) Proxy.Service_handler.t) -> ('a, 'v) Proxy.t
+val bind : t -> (('a, 'v, [`Client]) Proxy.Service_handler.t) -> ('a, 'v, [`Client]) Proxy.t
 (** [bind t handler] gets the entry for [handler]'s interface,
     checks that the version is compatible, and creates a proxy for it.
     Raises an exception if the interface isn't listed, or has the wrong version. *)

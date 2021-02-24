@@ -1,7 +1,7 @@
 open Wayland_server
 
 type t = {
-  conn : Connection.t;
+  conn : [`Server] Connection.t;
   wl_display : [`V1] Wl_display.t;
 }
 

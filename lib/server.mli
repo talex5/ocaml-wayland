@@ -1,6 +1,6 @@
 type t
 
-val connect : S.transport -> (([`Wl_registry], [`V1]) Proxy.t -> unit) -> t
+val connect : S.transport -> (([`Wl_registry], [`V1], [`Server]) Proxy.t -> unit) -> t
 (** [connect transport registry] runs the Wayland protocol over [transport]
     (typically created with {!Unix_transport.of_socket}).
     It spawns a background thread to handle incoming messages.

@@ -23,9 +23,9 @@ module S = struct
   type 'a user_data = 
     | Region : region_data -> [`Wl_region] user_data
 
-  type 'a Wayland.S.user_data += Server of 'a user_data
+  type ('a, 'role) Wayland.S.user_data += Server of 'a user_data
 
-  let user_data (proxy : ('a, _) Proxy.t) : 'a user_data =
+  let user_data (proxy : ('a, _, 'role) Proxy.t) : 'a user_data =
     match Wayland.Proxy.user_data proxy with
     | Server x -> x
     | S.No_data -> Fmt.failwith "No data attached to %a!" Proxy.pp proxy
@@ -79,7 +79,7 @@ module S = struct
     let _ : Server.t =
       Server.connect socket (fun reg ->
           Proxy.Handler.attach reg @@ Wl_registry.v1 @@ object
-            method on_bind : type a. _ -> name:int32 -> (a, [`Unknown]) Proxy.t -> unit =
+            method on_bind : type a. _ -> name:int32 -> (a, [`Unknown], _) Proxy.t -> unit =
               fun _ ~name proxy ->
               match Proxy.ty proxy with
               | Wayland_proto.Wl_compositor.T ->

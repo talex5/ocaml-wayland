@@ -1,9 +1,9 @@
-type t
+type 'a t
 
 val connect :
-  [`Client | `Server] ->
+  ([< `Client | `Server] as 'role) ->
   S.transport ->
-  ('a, 'v) Proxy.Service_handler.t ->
-  (t * ('a, 'v) Proxy.t)
+  ('a, 'v, 'role) Proxy.Service_handler.t ->
+  ('role t * ('a, 'v, 'role) Proxy.t)
 
-val listen : t -> unit Lwt.t
+val listen : [< `Client | `Server ] t -> unit Lwt.t

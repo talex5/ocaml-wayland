@@ -1,7 +1,7 @@
 open Wayland_client
 
 type t = {
-  conn : Connection.t;
+  conn : [`Client] Connection.t;
   wl_display : [`V1] Wl_display.t;
 }
 

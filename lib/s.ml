@@ -11,8 +11,8 @@ class type transport = object
       read and the list of attached file descriptors. *)
 end
 
-type 'a user_data = ..
-(** Extra data that can be attached to a proxy of type ['a]. *)
+type ('a, 'role) user_data = ..
+(** Extra data that can be attached to a proxy of type ['a] with ['role]. *)
 
-type 'a user_data += No_data
+type ('a, 'role) user_data += No_data
 (** The default user data for a proxy. *)
