@@ -20,7 +20,7 @@ let connect transport =
 let sync t =
   let result, set_result = Lwt.wait () in
   let _ : _ Wl_callback.t = Wl_display.sync t.wl_display @@ Wl_callback.v1 @@ object
-      method on_done _ ~callback_data:_ = Lwt.wakeup set_result ()
+      method on_done ~callback_data:_ = Lwt.wakeup set_result ()
     end
   in
   result

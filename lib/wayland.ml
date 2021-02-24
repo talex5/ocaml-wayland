@@ -13,7 +13,7 @@ module Registry = Registry
     (a wl_callback can be created by multiple objects). *)
 let callback fn : ([ `Wl_callback ], [> ]) Proxy.Handler.t =
   Proxy.Handler.cast_version @@ Wayland_client.Wl_callback.v1 @@ object
-    method on_done _ ~callback_data = fn callback_data
+    method on_done ~callback_data = fn callback_data
   end
 
 module Server = Server

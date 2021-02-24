@@ -378,7 +378,10 @@ let make_wrappers ~opens ~internal role (protocol : Protocol.t) f =
           msgs_in |> List.iter (fun (_, (msg : Message.t)) ->
               let next_tvar = ref 0 in
               let args = Fmt.strf "@[%a@]" (pp_sig ~next_tvar protocol iface) msg.args in
-              line "method virtual on_%s : @[%a@]'v t -> %s" msg.name pp_tvars !next_tvar args;
+              line "method virtual on_%s : @[%a@]%s %s"
+                msg.name pp_tvars !next_tvar
+                (if msg.ty = `Normal then "'v t ->" else "")
+                args;
               comment f msg.description;
               Fmt.cut f ()
             );
@@ -415,7 +418,11 @@ let make_wrappers ~opens ~internal role (protocol : Protocol.t) f =
                       line "@[<v2>let %s = Msg.get_%a _msg in@]" m pp_type_getter arg.ty
                   end;
                 );
-              line "_handlers#on_%s _proxy @[%a@]@]" msg.name (pp_args ~with_types:false) msg.args;
+              if msg.ty = `Destructor && role = `Server then line "Proxy.delete _proxy;";
+              line "_handlers#on_%s %s@[%a@]@]"
+                msg.name
+                (if msg.ty = `Normal then "_proxy " else "")
+                (pp_args ~with_types:false) msg.args;
             );
           if version > 1 then
             line "| _ -> _handle_v%d _handlers _proxy _msg@]" !prev_version

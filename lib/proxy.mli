@@ -6,10 +6,6 @@ type ('a, 'v) proxy := ('a, 'v) t               (* Alias for use inside this fil
 type 'v generic = Proxy : ('a, 'v) t -> 'v generic
 (** A proxy whose type isn't known statically. Use {!ty} and pattern matching to recover the type. *)
 
-val delete : _ t -> unit
-(** [delete t] sends a delete event from object 1 and removes [t] from the
-    object table. This is only used in server code. *)
-
 val user_data : ('a, _) t -> 'a S.user_data
 (** [user_data t] returns the data attached to the proxy when it was created.
     Returns [No_data] if nothing was attached. *)
@@ -132,6 +128,11 @@ val unknown_event : int -> string
 
 val unknown_request : int -> string
 (** A suitable string to display for an unknown request number. *)
+
+val delete : _ t -> unit
+(** [delete t] sends a delete event from object 1 and removes [t] from the
+    object table. This is only used in server code, and is called automatically
+    by the generated code when receiving a destructor request. *)
 
 val pp : _ t Fmt.t
 
