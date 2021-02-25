@@ -29,6 +29,10 @@ val get_string : _ t -> string
 (** [get_string t] returns the next argument (which must be a string) from [t] and advances the next-argument pointer.
     The string returned does not include the trailing ['\0']. *)
 
+val get_string_opt : _ t -> string option
+(** [get_string_opt t] returns the next argument (which must be a string or NULL) from [t] and advances the next-argument pointer.
+    The string returned does not include the trailing ['\0']. *)
+
 val get_array  : _ t -> string
 (** [get_array t] returns the next argument (which must be array) from [t] and advances the next-argument pointer. *)
 
@@ -43,17 +47,18 @@ val get_fixed  : _ t -> Fixed.t
 
 (** {2 Generating messages} *)
 
-val alloc : obj:int32 -> op:int -> ints:int -> strings:string list -> arrays:string list -> ('a, [`W]) t
+val alloc : obj:int32 -> op:int -> ints:int -> strings:string option list -> arrays:string list -> ('a, [`W]) t
 (** See {!Proxy.alloc}. *)
 
-val add_int    : (_, [`W]) t -> int32 -> unit
-val add_string : (_, [`W]) t -> string -> unit
-val add_array  : (_, [`W]) t -> string -> unit
+val add_int        : (_, [`W]) t -> int32 -> unit
+val add_string     : (_, [`W]) t -> string -> unit
+val add_string_opt : (_, [`W]) t -> string option -> unit
+val add_array      : (_, [`W]) t -> string -> unit
 
-val add_fd     : (_, [`W]) t -> Unix.file_descr -> unit
+val add_fd         : (_, [`W]) t -> Unix.file_descr -> unit
 (** [add_fd t fd] adds a copy of [fd] (made with [Unix.dup]) to the message. *)
 
-val add_fixed  : (_, [`W]) t -> Fixed.t -> unit
+val add_fixed      : (_, [`W]) t -> Fixed.t -> unit
 
 (**/**)
 

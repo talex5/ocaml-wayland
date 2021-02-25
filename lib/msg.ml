@@ -40,11 +40,22 @@ let get_string t =
   t.next <- t.next + 4 + ((len_excl_term + 4) land -4);
   Cstruct.to_string cs ~off:4 ~len:len_excl_term
 
+let get_string_opt t =
+  let cs = Cstruct.shift t.buffer t.next in
+  let len_excl_term = (NE.get_uint32 cs 0 |> Int32.to_int) - 1 in
+  t.next <- t.next + 4 + ((len_excl_term + 4) land -4);
+  if len_excl_term = -1 then None
+  else Some (Cstruct.to_string cs ~off:4 ~len:len_excl_term)
+
 let add_string t v =
   let len_excl_term = String.length v in
   add_int t (Int32.of_int (len_excl_term + 1));
   Cstruct.blit_from_string v 0 t.buffer t.next len_excl_term;
   t.next <- t.next + ((len_excl_term + 4) land -4)
+
+let add_string_opt t = function
+  | None -> add_int t Int32.zero
+  | Some v -> add_string t v
 
 let get_array t =
   let cs = Cstruct.shift t.buffer t.next in
@@ -72,7 +83,9 @@ let add_fixed t v =
 
 let rec count_strings acc = function
   | [] -> acc
-  | s :: ss ->
+  | None :: ss ->
+    count_strings (acc + 4) ss
+  | Some s :: ss ->
     let len = 4 + (String.length s + 4) land -4 in (* Note: includes ['\0'] terminator *)
     count_strings (acc + len) ss
 

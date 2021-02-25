@@ -51,15 +51,18 @@ module S = struct
     let sid = t.next_surface in
     t.next_surface <- t.next_surface + 1;
     log t "Created surface %d" sid;
-    Proxy.Handler.attach m @@ Wl_surface.v1 @@ object
+    Proxy.Handler.attach m @@ Wl_surface.v1 @@ object (_ : 'a Wl_surface.h1)
       method on_attach _ ~buffer:_ ~x:_ ~y:_ = failwith "Not implemented"
       method on_commit _ = failwith "Not implemented"
       method on_damage _ ~x:_ ~y:_ ~width:_ ~height:_ = failwith "Not implemented"
       method on_destroy = failwith "Not implemented"
       method on_frame _ _callback = failwith "Not implemented"
       method on_set_input_region _ ~region =
-        let Region r = user_data region in
-        log t "Surface %d input region <- %a" sid (Fmt.(list ~sep:comma) pp_rect) !r
+        match region with
+        | None -> log t "Surface %d input region cleared" sid
+        | Some region ->
+          let Region r = user_data region in
+          log t "Surface %d input region <- %a" sid (Fmt.(list ~sep:comma) pp_rect) !r
       method on_set_opaque_region _ ~region:_ = failwith "Not implemented"
     end
 
@@ -108,7 +111,7 @@ let test_simple _ () =
   in
   let region = Wl_compositor.create_region comp @@ Wl_region.v1 () in
   Wl_region.add region ~x:10l ~y:20l ~width:30l ~height:40l;
-  Wl_surface.set_input_region surface ~region;
+  Wl_surface.set_input_region surface ~region:(Some region);
   let* () = Display.sync c in
   Alcotest.(check (list string)) "Check log" [
     "Created surface 1";
