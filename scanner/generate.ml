@@ -251,7 +251,7 @@ let pp_enum f (enum : Enum.t) =
     enum.entries |> List.iter (fun (e : Entry.t) ->
         Fmt.pf f "@,";
         comment f e.description;
-        Fmt.pf f "@,let %s = %ld" (mangle e.name) e.value
+        Fmt.pf f "@,let %s = %ldl" (mangle e.name) e.value
       );
     Fmt.pf f "@,";
     Fmt.pf f "@,let to_int32 = Fun.id";
