@@ -14,6 +14,7 @@ type t = {
   mutable width : int;
   mutable height : int;
   mutable scroll : int;
+  mutable vy : int;
 }
 
 (* Draw the content to [t.surface]. *)
@@ -78,7 +79,7 @@ let () =
         method on_capabilities _ ~capabilities:_ = ()
       end
     in
-    let t = { shm; surface; scroll = 0; width = 0; height = 0; fg = 0xFFEEEEEEl } in
+    let t = { shm; surface; scroll = 0; vy = 1; width = 0; height = 0; fg = 0xFFEEEEEEl } in
     let closed, set_closed = Lwt.wait () in
     let _keyboard = Wl_seat.get_keyboard seat @@ Wl_keyboard.v1 @@ object
         method on_keymap    _ ~format:_ ~fd ~size:_ = Unix.close fd
@@ -89,6 +90,17 @@ let () =
           if state = Wl_keyboard.Key_state.Pressed then
             t.fg <- Int32.(logand 0xffffffl (add t.fg (shift_left 0x101l (0xf land (Int32.to_int key)))))
         method on_modifiers _ ~serial:_ ~mods_depressed:_ ~mods_latched:_ ~mods_locked:_ ~group:_ = ()
+      end
+    in
+    let _pointer = Wl_seat.get_pointer seat @@ Wl_pointer.v1 @@ object
+        method on_axis _ ~time:_ ~axis:_ ~value:_ = ()
+        method on_button _ ~serial:_ ~time:_ ~button:_ ~state =
+          match state with
+          | Wl_pointer.Button_state.Pressed -> t.vy <- -t.vy
+          | Wl_pointer.Button_state.Released -> ()
+        method on_enter _ ~serial:_ ~surface:_ ~surface_x:_ ~surface_y:_ = ()
+        method on_leave _ ~serial:_ ~surface:_ = ()
+        method on_motion _ ~time:_ ~surface_x:_ ~surface_y:_ = ()
       end
     in
     let configured, set_configured = Lwt.wait () in
@@ -115,7 +127,7 @@ let () =
       let _frame = Wl_surface.frame surface (Wayland.callback ready) in
       draw_frame t
     and ready _ =
-      t.scroll <- t.scroll + 1;
+      t.scroll <- t.scroll + t.vy;
       animate ()
     in
     animate ();
