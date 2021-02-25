@@ -55,20 +55,22 @@ let pp_tvars f = function
     Fmt.string f ". "
 
 let pp_type ~role ~next_tvar proto iface f (arg:Arg.t) =
-  match arg.ty with
-  | `Uint | `Int when arg.enum <> None -> Fmt.pf f "%a.t" (pp_enum_module proto iface) arg
-  | `Uint | `Int -> Fmt.string f "int32"
-  | `String -> Fmt.string f "string"
-  | `Array -> Fmt.string f "string"
-  | `Object None -> Fmt.string f "int32"
-  | `New_ID None ->
-    let t = !next_tvar in
-    next_tvar := t + 1;
-    Fmt.pf f "('x%d, [`Unknown], %a) Proxy.t" t pp_role role
-  | `Object (Some i)
-  | `New_ID (Some i) -> Fmt.pf f "(%a, 'v, %a) Proxy.t" pp_poly i pp_role role
-  | `Fixed -> Fmt.string f "Fixed.t"
-  | `FD -> Fmt.string f "Unix.file_descr"
+  begin match arg.ty with
+    | `Uint | `Int when arg.enum <> None -> Fmt.pf f "%a.t" (pp_enum_module proto iface) arg
+    | `Uint | `Int -> Fmt.string f "int32"
+    | `String -> Fmt.string f "string"
+    | `Array -> Fmt.string f "string"
+    | `Object None -> Fmt.string f "int32"
+    | `New_ID None ->
+      let t = !next_tvar in
+      next_tvar := t + 1;
+      Fmt.pf f "('x%d, [`Unknown], %a) Proxy.t" t pp_role role
+    | `Object (Some i)
+    | `New_ID (Some i) -> Fmt.pf f "(%a, 'v, %a) Proxy.t" pp_poly i pp_role role
+    | `Fixed -> Fmt.string f "Fixed.t"
+    | `FD -> Fmt.string f "Unix.file_descr"
+  end;
+  if arg.allow_null then Fmt.string f " option"
 
 let pp_type_getter f (ty:Arg.ty) =
   Fmt.string f @@
@@ -104,7 +106,8 @@ let pp_args ~role ~with_types =
     let m = mangle arg.name in
     match arg.ty with
     | `Object (Some interface) when with_types ->
-      Fmt.pf f "(%s:(%a, _, %a) Proxy.t)" m pp_poly interface pp_role role
+      Fmt.pf f "(%s:(%a, _, %a) Proxy.t%s)" m pp_poly interface pp_role role
+        (if arg.allow_null then " option" else "")
     | `New_ID (Some interface) when with_types ->
       Fmt.pf f "(%s:(%a, 'v, %a) Proxy.Handler.t)" m pp_poly interface pp_role role
     | _ ->
@@ -177,8 +180,10 @@ let pp_strings f args =
   args
   |> List.filter_map (fun (a : Arg.t) ->
       match a.ty with
-      | `New_ID None -> Some (Fmt.strf "(Proxy.Service_handler.interface %s)" (mangle a.name))
-      | `String -> Some (mangle a.name)
+      | `New_ID None -> Some (Fmt.strf "(Some (Proxy.Service_handler.interface %s))" (mangle a.name))
+      | `String ->
+        if a.allow_null then Some (mangle a.name)
+        else Some (Fmt.strf "(Some %s)" (mangle a.name))
       | _ -> None
     )
   |> Fmt.(list ~sep:semi string) f
@@ -357,12 +362,17 @@ let make_wrappers ~opens ~internal role (protocol : Protocol.t) f =
                   | `New_ID (Some _) ->
                     line "Msg.add_int _msg (Proxy.id __%s);" m
                   | `Object _ ->
-                    line "Msg.add_int _msg (Proxy.id %s);" m
+                    line "Msg.add_int _msg (Proxy.id%s %s);"
+                      (if arg.allow_null then "_opt" else "")
+                      m
                   | `Int | `Uint when arg.enum <> None ->
                     line "Msg.add_int _msg (%a.to_int32 %s);"
                       (pp_enum_module protocol iface) arg m
                   | _ ->
-                    line "Msg.add_%a _msg %s;" pp_type_getter arg.ty m
+                    line "Msg.add_%a%s _msg %s;"
+                      pp_type_getter arg.ty
+                      (if arg.allow_null then "_opt" else "")
+                      m
                 );
               line "Proxy.send _t _msg";
               if msg.ty = `Destructor then
@@ -412,6 +422,16 @@ let make_wrappers ~opens ~internal role (protocol : Protocol.t) f =
                       line "@[<v2>let %s : (%a, _, _) Proxy.t =@ Msg.get_int _msg |> Proxy.Handler.accept_new _proxy (module Imports.%s) in@]"
                         m pp_poly i
                         (module_name i)
+                    | `Object (Some i) when arg.allow_null ->
+                      line "@[<v2>let %s : (%a, _, _) Proxy.t option =" m pp_poly i;
+                      line "match Msg.get_int _msg  with";
+                      line "| 0l -> None";
+                      line "@[<v2>| id ->";
+                      line "let Proxy.Proxy p = Proxy.lookup_other _proxy id in";
+                      line "match Proxy.ty p with";
+                      line "| Imports.%s.T -> Some p" (module_name i);
+                      line "| _ -> Proxy.wrong_type ~parent:_proxy ~expected:%S p@]" i;
+                      line "in@]"
                     | `Object (Some i) ->
                       line "@[<v2>let %s : (%a, _, _) Proxy.t =" m pp_poly i;
                       line "let Proxy.Proxy p = Msg.get_int _msg |> Proxy.lookup_other _proxy in";
@@ -420,7 +440,8 @@ let make_wrappers ~opens ~internal role (protocol : Protocol.t) f =
                       line "| _ -> Proxy.wrong_type ~parent:_proxy ~expected:%S p" i;
                       line "in@]"
                     | _ ->
-                      line "@[<v2>let %s = Msg.get_%a _msg in@]" m pp_type_getter arg.ty
+                      line "@[<v2>let %s = Msg.get_%a%s _msg in@]" m pp_type_getter arg.ty
+                        (if arg.allow_null then "_opt" else "");
                   end;
                 );
               if msg.ty = `Destructor && role = `Server then line "Proxy.delete _proxy;";

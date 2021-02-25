@@ -111,7 +111,10 @@ end
 val id : _ t -> int32
 (** [id t] is [t]'s object ID. Use this to refer to the object in a message. *)
 
-val alloc : ('a, _, _) t -> op:int -> ints:int -> strings:string list -> arrays:string list -> ('a, [`W]) Msg.t
+val id_opt : _ t option -> int32
+(** Like [id] but returns 0l for [None]. *)
+
+val alloc : ('a, _, _) t -> op:int -> ints:int -> strings:string option list -> arrays:string list -> ('a, [`W]) Msg.t
 (** [alloc t ~op ~ints ~strings ~arrays] is a fresh message for [t]'s [op] operation.
     The message is the right size for [ints] integer arguments, all the strings in [strings],
     and all the arrays in [arrays]. *)

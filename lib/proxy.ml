@@ -98,6 +98,10 @@ let id t =
   assert t.valid;
   t.id
 
+let id_opt = function
+  | None -> 0l
+  | Some t -> id t
+
 let alloc t = Msg.alloc ~obj:t.id
 
 let send (type a) (t:_ t) (msg : (a, [`W]) Msg.t) =

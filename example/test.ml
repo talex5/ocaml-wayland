@@ -38,7 +38,7 @@ let draw_frame t =
     end
   in
   Wl_shm_pool.destroy pool;
-  Wl_surface.attach t.surface ~buffer ~x:0l ~y:0l;
+  Wl_surface.attach t.surface ~buffer:(Some buffer) ~x:0l ~y:0l;
   let scroll = t.scroll in
   for row = 0 to t.height - 1 do
     for col = 0 to t.width - 1 do
