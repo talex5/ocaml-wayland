@@ -170,10 +170,22 @@ let trim_lines xs =
   in
   aux1 xs
 
+let fix_quotes s =
+  let rec unquoted i =
+    match String.index_from_opt s i '"' with
+    | None -> s         (* Correctly quoted string *)
+    | Some i -> quoted (i + 1)
+  and quoted i =
+    match String.index_from_opt s i '"' with
+    | None -> s ^ "\""  (* Incorrectly quoted string *)
+    | Some i -> unquoted (i + 1)
+  in
+  unquoted 0
+
 let comment f = function
   | None -> ()
   | Some (d : Description.t) ->
-    let full = String.split_on_char '\n' d.full |> List.map String.trim |> trim_lines in
+    let full = d.full |> fix_quotes |> String.split_on_char '\n' |> List.map String.trim |> trim_lines in
     Fmt.pf f "@,(** @[<v>%s.@,@,%a@] *)" (String.capitalize_ascii d.summary) Fmt.(list ~sep:cut string) full
 
 let pp_strings f args =
