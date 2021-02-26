@@ -12,6 +12,7 @@ let pp_rect f {x; y; width; height} = Fmt.pf f "(%ld, %ld)+(%ld, %ld)" x y width
 
 module S = struct
   type t = {
+    mutable serial : int32;
     mutable next_surface : int;
     mutable log : string list;
   }
@@ -76,11 +77,23 @@ module S = struct
 
   let connect socket =
     let t = {
+      serial = 0l;
       next_surface = 1;
       log = [];
     } in
+    let next_serial () =
+      let i = t.serial in
+      t.serial <- Int32.succ i;
+      i
+    in
     let s : Server.t =
-      Server.connect socket (fun reg ->
+      Server.connect socket @@ Wl_display.v1 @@ object
+        method on_sync _ cb =
+          Proxy.Handler.attach cb @@ Wl_callback.v1 ();
+          Wl_callback.done_ cb ~callback_data:(next_serial ());
+          Proxy.delete cb
+
+        method on_get_registry _ reg =
           Proxy.Handler.attach reg @@ Wl_registry.v1 @@ object
             method on_bind : type a. _ -> name:int32 -> (a, [`Unknown], _) Proxy.t -> unit =
               fun _ ~name proxy ->
@@ -91,7 +104,7 @@ module S = struct
               | _ -> Fmt.failwith "Invalid service name for %a" Proxy.pp proxy
           end;
           Wl_registry.global reg ~name:comp_name ~interface:"wl_compositor" ~version:1l
-        )
+      end
     in
     Lwt.async (fun () ->
         let open Lwt.Infix in
