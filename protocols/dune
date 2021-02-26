@@ -7,3 +7,8 @@
  (targets xdg_shell_client.ml xdg_shell_server.ml xdg_shell_proto.ml)
  (deps   xdg-shell.xml)
  (action (run %{bin:wayland-scanner-ocaml} --open Wayland.Wayland_proto %{deps})))
+
+(rule
+ (targets xdg_output_unstable_v1_client.ml xdg_output_unstable_v1_server.ml xdg_output_unstable_v1_proto.ml)
+ (deps   xdg-output-unstable-v1.xml)
+ (action (run %{bin:wayland-scanner-ocaml} --open Wayland.Wayland_proto %{deps})))
