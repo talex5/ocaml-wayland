@@ -66,14 +66,14 @@ let () =
       );
     (* Get the registry and find the objects we need. *)
     let* reg = Registry.of_display display in
-    let compositor = Registry.bind reg (new Wl_compositor.handlers ~version:4l) in
+    let compositor = Registry.bind reg (new Wl_compositor.v4) in
     let shm = Registry.bind reg @@ object
-        inherit [_] Wl_shm.handlers ~version:1l
+        inherit Wl_shm.v1
         method on_format _ ~format:_ = ()
       end
     in
     let xdg_wm_base = Registry.bind reg @@ object
-        inherit [_] Xdg_wm_base.handlers ~version:1l
+        inherit Xdg_wm_base.v1
         method on_ping = Xdg_wm_base.pong
       end
     in
@@ -84,7 +84,7 @@ let () =
       end
     in
     let seat = Registry.bind reg @@ object
-        inherit [_] Wl_seat.handlers ~version:1l
+        inherit Wl_seat.v1
         method on_capabilities _ ~capabilities:_ = ()
         method on_name _ ~name:_ = ()
       end

@@ -74,7 +74,7 @@ let connect ~trace role transport handler =
     set_closed;
     trace = Proxy.trace trace;
   } in
-  let display_proxy = Proxy.add_root t (handler :> _ Proxy.Service_handler.t) in
+  let display_proxy = Proxy.add_root t (handler :> _ Proxy.Handler.t) in
   Lwt.async (fun () -> listen t);
   (t, display_proxy)
 

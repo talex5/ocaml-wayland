@@ -74,13 +74,11 @@ module S = struct
     end
 
   let make_compositor t proxy =
-    let _ : _ Proxy.t = Proxy.Service_handler.attach proxy @@ object
-        inherit [_] Wl_compositor.handlers ~version:1l
-        method on_create_region _ region = make_region region
-        method on_create_surface _ surface = make_surface t surface
-      end
-    in
-    ()
+    Proxy.Service_handler.attach proxy @@ object
+      inherit [_] Wl_compositor.handlers
+      method on_create_region _ region = make_region region
+      method on_create_surface _ surface = make_surface t surface
+    end
 
   let connect socket =
     let t = {
@@ -95,7 +93,7 @@ module S = struct
     in
     let s : Server.t =
       Server.connect socket @@ object
-        inherit [_] Wl_display.handlers ~version:1l
+        inherit [_] Wl_display.handlers
         method on_sync _ cb =
           Proxy.Handler.attach cb @@ new Wl_callback.handlers;
           Wl_callback.done_ cb ~callback_data:(next_serial ());
@@ -136,7 +134,7 @@ let test_simple _ () =
   let server = Unix_transport.of_socket socket_s |> S.connect in
   let open Wayland.Wayland_client in
   let* reg = Registry.of_display c in
-  let comp = Registry.bind reg @@ new Wl_compositor.handlers ~version:1l in
+  let comp = Registry.bind reg @@ new Wl_compositor.v1 in
   let surface = Wl_compositor.create_surface comp @@ object
       inherit [_] Wl_surface.handlers
       method on_enter _ ~output:_ = ()

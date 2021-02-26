@@ -40,10 +40,10 @@ let get_exn t interface =
 
 let bind t handler =
   let iface = Proxy.Service_handler.interface handler in
-  let handler_version = Proxy.Service_handler.version handler in
-  let {name; version} = get_exn t iface in
-  if version < handler_version then
-    Fmt.failwith "Can't use version %ld of %s; registry only supports <= %ld" handler_version iface version;
-  Wl_registry.bind t.registry ~name handler
+  let min_version = handler#min_version in
+  let {name; version = service_max_version} = get_exn t iface in
+  if service_max_version < min_version then
+    Fmt.failwith "Can't use version %ld of %s; registry only supports <= %ld" min_version iface service_max_version;
+  Wl_registry.bind t.registry ~name (handler, min handler#max_version service_max_version)
 
 let wl_registry t = t.registry

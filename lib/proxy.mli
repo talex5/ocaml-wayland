@@ -50,16 +50,6 @@ module Handler : sig
       Typically, a constructor will let the user pick from a range of versions
       for ['v], which will then be constrained by the [spawn] call. *)
 
-  val v :
-    ?user_data:('a, 'role) S.user_data ->
-    (module Metadata.S with type t = 'a) ->
-    (('a, 'v, 'role) proxy -> ('a, [`R]) Msg.t -> unit) ->
-    ('a, 'v, 'role) t
-    (** [v metadata dispatch] is a handler for the interface [metadata],
-        which uses [dispatch self msg] to handle incoming messages.
-        Only used by the generated code.
-        @param user_data Extra data to be attached to the proxy. *)
-
   val cast_version : ('a, _, 'role) t -> ('a, _, 'role) t
   (** If the version rules turn out to be too restrictive, this can be used to disable them.
       Using this incorrectly may lead to a protocol error (such as receiving an event for which
@@ -81,29 +71,19 @@ end
 module Service_handler : sig
   class type ['a, 'v, 'role] t = object
     inherit ['a, 'v, 'role] Handler.t
-    method version : int32
+    method min_version : int32
+    method max_version : int32
   end
   (** An [('a, 'v) t] handles incoming messages for a service object of type ['a].
-      The difference between services and other objects is that a service gets its version at runtime
-      from the bind request, whereas other objects inherit their version from their parent. *)
-
-  val v :
-    version:int32 ->
-    ?user_data:('a, 'role) S.user_data ->
-    (module Metadata.S with type t = 'a) ->
-    (('a, 'v, 'role) proxy -> ('a, [`R]) Msg.t -> unit) ->
-    ('a, 'v, 'role) t
-    (** [v ~version metadata dispatch] is a handler for the interface [metadata],
-        which uses [dispatch self msg] to handle incoming messages.
-        Only used by the generated code.
-        @param version The version to request in the bind call.
-        @param user_data Extra data to be attached to the proxy. *)
+      This type is used when binding a service, to choose the version.
+      All other handlers get the version from elsewhere (inherited from their parent
+      object). *)
 
   val interface : (_, _, _) #t -> string
   (** [interface t] is the interface from [t]'s metadata. *)
 
-  val version : (_, _, _) #t -> int32
-  (** [version t] is the version from [t]. *)
+  val min_version : (_, _, _) #t -> int32
+  (** [min_version t] is the minimum version supported by [t]. *)
 
   val cast_version : ('a, _, 'role) t -> ('a, _, 'role) t
   (** If the version rules turn out to be too restrictive, this can be used to disable them.
@@ -121,10 +101,14 @@ module Service_handler : sig
       since otherwise processing a message addressed to the new object will fail.
       This is called from the generated code; the user code then calls the result. *)
 
-  val attach : ('a, [`Unknown], 'role) proxy -> ('a, 'v, 'role) #t -> ('a, 'v, 'role) proxy
-  (** [attach proxy t] sets [t] as the handler for [proxy],
+  val attach_proxy : ('a, [`Unknown], 'role) proxy -> ('a, 'v, 'role) #t -> ('a, 'v, 'role) proxy
+  (** [attach_proxy p t] sets [t] as the handler for [p],
       which must be a partly initialised proxy returned by [accept_new].
       It returns the proxy with its version cast to the handler's version. *)
+
+  val attach : ('a, [`Unknown], 'role) proxy -> ('a, 'v, 'role) #t -> unit
+  (** Like [attach_proxy], but ignores the resulting proxy.
+      Useful if the object only needs to respond to messages from the peer. *)
 end
 
 val id : _ t -> int32
@@ -145,9 +129,8 @@ val spawn : (_, 'v, [< `Client | `Server ] as 'role) t -> ('a, 'v, 'role) #Handl
 (** Create a new proxy on [t]'s connection with an unused ID.
     The new object has the same version as its parent. *)
 
-val spawn_bind : (_, _, [< `Client | `Server ] as 'role) t -> ('a, 'v, 'role) #Service_handler.t -> ('a, 'v, 'role) t
-(** Like [spawn] but the child's version is taken from the handler,
-    not inherited from the parent.
+val spawn_bind : (_, _, [< `Client | `Server ] as 'role) t -> (('a, 'v, 'role) #Service_handler.t * int32) -> ('a, 'v, 'role) t
+(** Like [spawn] but the child's version is given explicitly, not inherited from the parent.
     This is used for binding with the global registry. *)
 
 val shutdown_send : _ t -> unit
@@ -179,7 +162,7 @@ val pp : _ t Fmt.t
 
 (**/**)
 
-val add_root : 'role Internal.connection -> ('a, 'v, 'role) #Service_handler.t -> ('a, 'v, 'role) t
+val add_root : 'role Internal.connection -> ('a, 'v, 'role) #Handler.t -> ('a, 'v, 'role) t
 (** [add_root conn h] sets [h] as the handler for object 1. *)
 
 val delete_other : (_, _, [`Client]) t -> int32 -> unit

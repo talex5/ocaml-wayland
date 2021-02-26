@@ -63,7 +63,8 @@ See the [API documentation][] for more information.
 ## Interface versions
 
 Each proxy object has phantom types for the interface and the version(s) of that interface.
-e.g. a value of type ``([`Wl_surface], [`V3]) Proxy.t`` is a proxy to a version 3 surface object.
+e.g. a value of type ``([`Wl_surface], [`V3], [`Client]) Proxy.t``
+is a client's proxy to a version 3 surface object.
 
 Functions that send messages require a compatible version.
 For example, `Wl_surface.set_buffer_transform` was introduced in version 2,
@@ -104,54 +105,31 @@ This says that `create_surface` can be used with any version `'v` of the composi
 but you must supply handlers for version `'v` of the surface object.
 The return value will be a surface proxy with the same version as the compositor.
 
-There is one handler constructor function for each distinct version of an interface.
-For example, to create a handler for version 3 of the surface interface you can use this function:
+When binding a top-level service, there is one handler constructor function for each distinct version.
+For example, to create a handler for version 3 (or later) of the compositor interface
+you would have your handlers inherit from `Wl_compositor.v3`
+(or just use it directly, since in this case there are no events to be handled). e.g.
 
 ```ocaml
-module Wl_surface : sig
-  ...
-  val v3 : ([< `V1 | `V2 | `V3 ] as 'v) h3 ->
-           ([ `Wl_surface ], 'v) Proxy.Handler.t
-  ...
-end
+let compositor = Registry.bind reg @@ new Wl_compositor.v3 in
+(* [compositor] has type [([ `Wl_compositor ], [ `V3 | `V4 ], [ `Client ]) Proxy.t]. *)
 ```
 
-The type for `v3` says that if you supply handlers for version 3 of the protocol then
-you get a handler that can be used for object versions 1, 2 or 3.
-When you try to create the surface using a compositor, the creation method will further
-constrain the version to match the compositor's version.
-So the ``[< `V1 | `V2 | `V3 ]`` constraint just prevents you from using this with e.g. a
-v4 compositor.
+This means that you can send any compositor request that was available in version 3
+(but the `bind` will fail if the server doesn't support this version).
+When you create new objects using the compositor, it will know that they also will be version 3 or later.
 
-For example, to use this with a ``[`V2 | `V3] Wl_compositor.t``
-(that is, a compositor that is either v2 or v3), you would use `v3` at type:
+To avoid an explosion of version combinations,
+the generated handler types require you to handle incoming messages of all versions in your copy of the schema.
+For example, you can't ask for exactly version 3 of the compositor
+and then not bother implementing handlers for v4 events.
 
-```ocaml
-val v3 : [`V2 | `V3] h3 -> ([ `Wl_surface ], [`V2 | `V3]) Proxy.Handler.t
-```
-
-The handlers you pass (`h3`) must handle any incoming v3 message,
-but when sending they can only use messages available in both v2 and v3.
-
-For top-level services (objects that are listed in the registry and for which the
-client specifies the version explicitly), the constructor gives a
-`Proxy.Service_handler.t` instead:
-
-```ocaml
-module Wl_compositor : sig
-  ...
-  val v3 : unit -> ([ `Wl_compositor ], [> `V3 ]) Proxy.Service_handler.t
-  ...
-end
-```
-
-When using `v3`, you don't have to worry about it being a v1 or v2 object,
-as you will get the exact version requested.
-Note: `Wl_compositor` doesn't produce any events, so the handlers are just `()` in this case.
+This library requires servers to handle all versions of the protocol in the schema
+(they can't specify a minimum or maximum version).
 
 The version types should prevent you from sending messages the other side won't understand,
 or failing to handle a message the other side sends. However, they may be inflexible.
-You can use `Handler.cast_version` to escape from the rules and manage things yourself if necessary.
+You can use `Proxy.cast_version` to escape from the rules and manage things yourself if necessary.
 
 ## Attaching extra data to objects
 
@@ -167,7 +145,7 @@ When the server gets the region as an argument to `set_input_region`
 it will want to recognise it as a region it created earlier,
 with private state holding the list of rectangles.
 
-You can attach data to a handler by specifying `~user_data` when creating the handler,
+You can attach data to a handler by specifying `method user_data` when creating the handler,
 and get it back using `Proxy.user_data`.
 
 Ideally, the application would define the `user_data` type,
@@ -179,9 +157,10 @@ type 'a my_user_data =
   | Region : region_data -> [`Wl_region] my_user_data
   | Output : output_data -> [`Wl_output] my_user_data
 
-type 'a Wayland.S.user_data += My_user_data of 'a my_user_data
+type ('a, 'role) Wayland.S.user_data +=
+    My_user_data : 'a my_user_data -> ('a, [`Client]) Wayland.S.user_data
 
-let user_data (proxy : ('a, _) Proxy.t) : 'a my_user_data =
+let user_data (proxy : ('a, _, 'role) Proxy.t) : 'a my_user_data =
   match Wayland.Proxy.user_data proxy with
   | My_user_data x -> x
   | S.No_data -> Fmt.failwith "No data attached to %a!" Proxy.pp proxy
@@ -253,7 +232,6 @@ until the upstream service has confirmed the deletion too.
 ## TODO
 
 - Using `$WAYLAND_SOCKET` to pass an FD doesn't work yet.
-- Version typing for server-side top-level objects needs work.
 
 [The Wayland Protocol]: https://wayland-book.com/
 [Cap'n Proto RPC]: https://github.com/mirage/capnp-rpc

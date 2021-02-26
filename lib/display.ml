@@ -33,7 +33,7 @@ end
 
 let connect ?(trace=(module Trace : TRACE)) transport =
   let conn, wl_display = Connection.connect ~trace `Client transport @@ object
-      inherit [_] Wl_display.handlers ~version:1l
+      inherit Wl_display.v1
 
       method on_error _ ~object_id ~code ~message =
         Log.err (fun f -> f "Received Wayland error: %ld %S on object %ld" code message object_id)
