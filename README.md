@@ -204,9 +204,29 @@ To avoid the exceptions, you just need to ensure that:
 1. You don't extend `Wayland.S.user_data` with any other variants.
 2. You don't forget to attach the data when creating the handler.
 
+## Deleting objects
+
+Some message types are marked as "destructors".
+Usually the client sends a destructor request and the server acknowledges it.
+In some cases (e.g. callbacks, which have no requests), the server calls the destructor.
+
+After a client either sends or receives a destructor message,
+the object is marked as invalid and cannot be used for sending further messages.
+However, it can still receive them.
+When the client receives the delete acknowledgement,
+the object is removed from the table and its ID can be reused.
+Unlike other handlers, client destructor handlers do not take a proxy argument since
+the proxy is unusable by this point.
+
+On the server side, the handler will normally respond to a destructor call
+by calling `Proxy.delete` immediately.
+However, when relaying to an upstream service it may be useful to delay this
+until the upstream service has confirmed the deletion too.
+
 ## TODO
 
 - Using `$WAYLAND_SOCKET` to pass an FD doesn't work yet.
+- Version typing for server-side top-level objects needs work.
 - Needs more testing.
 
 [The Wayland Protocol]: https://wayland-book.com/

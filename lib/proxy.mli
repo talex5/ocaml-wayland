@@ -23,6 +23,14 @@ val ty : ('a, _, 'role) t -> 'a Metadata.ty
 
 val interface : _ t -> string
 
+val delete : (_, _, [`Server]) t -> unit
+(** [delete t] sends a delete event from object 1 and removes [t] from the
+    object table. This is only used in server code. *)
+
+val on_delete : (_, _, _) t -> (unit -> unit) -> unit
+(** [on_delete t f] calls [f] when [t] is deleted, either by [delete] being called (on the server)
+    or when the client receives confirmation of the deletion from the server. *)
+
 (** {2 Functions for use by generated code}
 
     You should not need to use these functions directly.
@@ -142,11 +150,6 @@ val unknown_event : int -> string
 
 val unknown_request : int -> string
 (** A suitable string to display for an unknown request number. *)
-
-val delete : (_, _, [`Server]) t -> unit
-(** [delete t] sends a delete event from object 1 and removes [t] from the
-    object table. This is only used in server code, and is called automatically
-    by the generated code when receiving a destructor request. *)
 
 val pp : _ t Fmt.t
 

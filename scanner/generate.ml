@@ -395,7 +395,7 @@ let make_wrappers ~opens ~internal role (protocol : Protocol.t) f =
               let args = Fmt.strf "@[%a@]" (pp_sig ~role ~next_tvar protocol iface) msg.args in
               line "method virtual on_%s : @[%a@]%s %s"
                 msg.name pp_tvars !next_tvar
-                (if msg.ty = `Normal then "'v t ->" else "")
+                (if msg.ty = `Normal || role = `Server then "'v t ->" else "")
                 args;
               comment f msg.description;
               Fmt.cut f ()
@@ -444,10 +444,11 @@ let make_wrappers ~opens ~internal role (protocol : Protocol.t) f =
                         (if arg.allow_null then "_opt" else "");
                   end;
                 );
-              if msg.ty = `Destructor && role = `Server then line "Proxy.delete _proxy;";
+              if msg.ty = `Destructor && role = `Client then
+                line "Proxy.invalidate _proxy;";
               line "_handlers#on_%s %s@[%a@]@]"
                 msg.name
-                (if msg.ty = `Normal then "_proxy " else "")
+                (if msg.ty = `Normal || role = `Server then "_proxy " else "")
                 (pp_args ~role ~with_types:false) msg.args;
             );
           if version > 1 then

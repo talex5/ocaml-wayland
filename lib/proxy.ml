@@ -25,7 +25,7 @@ let accept_new t ~version ~handler id =
   end;
   if Objects.mem id conn.objects then
     Fmt.failwith "An object with ID %ld already exists!" id;
-  let t' = { id; version; conn; valid = false; handler } in
+  let t' = { id; version; conn; valid = false; handler; on_delete = Queue.create () } in
   conn.objects <- Objects.add id (Generic t') conn.objects;
   t'
 
@@ -126,7 +126,7 @@ let send (type a) (t:_ t) (msg : (a, [`W]) Msg.t) =
 let spawn_bind t {Service_handler.version; handler } =
   let conn = t.conn in
   let id = get_unused_id conn in
-  let t' = { id; version; conn = t.conn; valid = true; handler } in
+  let t' = { id; version; conn = t.conn; valid = true; handler; on_delete = Queue.create () } in
   conn.objects <- Objects.add id (Generic t') conn.objects;
   t'
 
@@ -140,9 +140,12 @@ let invalidate t =
 
 let add_root conn { Service_handler.version; handler } =
   assert (version = 1l);
-  let display_proxy = { version; id = 1l; conn; valid = true; handler } in
+  let display_proxy = { version; id = 1l; conn; valid = true; handler; on_delete = Queue.create () } in
   conn.objects <- Objects.add display_proxy.id (Generic display_proxy) conn.objects;
   display_proxy
+
+let on_delete t fn =
+  Queue.add fn t.on_delete
 
 let delete t =
   let conn = t.conn in
@@ -155,15 +158,19 @@ let delete t =
     let Generic display = Objects.find 1l conn.objects in
     let msg = alloc display ~op:1 ~ints:1 ~strings:[] ~arrays:[] in
     Msg.add_int msg t.id;
-    send display msg
+    send display msg;
+    Queue.iter (fun f -> f ()) t.on_delete
   | _ -> Fmt.failwith "Object %a is not registered!" pp t
 
 let delete_other proxy id =
   let conn = proxy.conn in
-  let old = conn.objects in
-  conn.objects <- Objects.remove id conn.objects;
-  assert (conn.objects != old);
-  Internal.free_id conn id
+  match Objects.find_opt id conn.objects with
+  | None -> Fmt.failwith "Object %ld does not exist!" id
+  | Some (Generic proxy) ->
+    if proxy.valid then Log.warn (fun f -> f "Object %a deleted while still marked as valid!" pp proxy);
+    conn.objects <- Objects.remove id conn.objects;
+    Internal.free_id conn id;
+    Queue.iter (fun f -> f ()) proxy.on_delete
 
 let unknown_event = Fmt.strf "<unknown event %d>"
 let unknown_request = Fmt.strf "<unknown request %d>"

@@ -43,7 +43,7 @@ module S = struct
     Proxy.Handler.attach r @@ Wl_region.v1 ~user_data:(Server (Region rects)) @@ object
       method on_add _ ~x ~y ~width ~height =
         rects := { x; y; width; height } :: !rects
-      method on_destroy = ()
+      method on_destroy t = Proxy.delete t
       method on_subtract _ ~x:_ ~y:_ ~width:_ ~height:_ = failwith "Not implemented"
     end
 

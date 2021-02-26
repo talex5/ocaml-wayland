@@ -14,6 +14,7 @@ type 'role connection = {
   id : int32;
   conn : 'role connection;
   version : int32;
+  on_delete : (unit -> unit) Queue.t;
   mutable handler : ('a, 'role) handler;
   mutable valid : bool;
 }
