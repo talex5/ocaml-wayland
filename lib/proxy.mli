@@ -130,11 +130,11 @@ val alloc : ('a, _, _) t -> op:int -> ints:int -> strings:string option list -> 
 val send : ('a, _, [< `Client | `Server ]) t -> ('a, [`W]) Msg.t -> unit
 (** [send t msg] enqueues [msg] on [t]'s connection. *)
 
-val spawn : (_, 'v, 'role) t -> ('a, 'v, 'role) Handler.t -> ('a, 'v, 'role) t
+val spawn : (_, 'v, [< `Client | `Server ] as 'role) t -> ('a, 'v, 'role) Handler.t -> ('a, 'v, 'role) t
 (** Create a new proxy on [t]'s connection with an unused ID.
     The new object has the same version as its parent. *)
 
-val spawn_bind : (_, _, 'role) t -> ('a, 'v, 'role) Service_handler.t -> ('a, 'v, 'role) t
+val spawn_bind : (_, _, [< `Client | `Server ] as 'role) t -> ('a, 'v, 'role) Service_handler.t -> ('a, 'v, 'role) t
 (** Like [spawn] but the child's version is taken from the handler,
     not inherited from the parent.
     This is used for binding with the global registry. *)

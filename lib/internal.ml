@@ -33,14 +33,24 @@ let get_unused_id t =
     t.free_ids <- xs;
     x
   | [] ->
-    assert (Int32.unsigned_compare t.next_id 0xFF000000l < 0);
+    begin match t.role with
+      | `Client -> assert (Int32.unsigned_compare t.next_id 0xFF000000l < 0);
+      | `Server -> assert (Int32.unsigned_compare t.next_id 0xFF000000l >= 0);
+    end;
     let x = t.next_id in
     t.next_id <- Int32.succ x;
     x
 
-(* Push [id] on to the stack of free IDs. *)
+let id_allocated_by_us conn id =
+  let is_service_id = Int32.unsigned_compare id 0xFF000000l >= 0 in
+  match conn.role with
+  | `Server -> is_service_id
+  | `Client -> not is_service_id
+
+(* Push [id] on to the stack of free IDs if we allocated it. *)
 let free_id t id =
-  t.free_ids <- id :: t.free_ids
+  if id_allocated_by_us t id then
+    t.free_ids <- id :: t.free_ids
 
 (* Call this when adding an item to an empty [outbox].
    On exit, the outbox is empty again. *)
@@ -82,4 +92,4 @@ let enqueue t msg =
 
 let pp_proxy f (type a) (x: (a, _) proxy) =
   let (module M : Metadata.S with type t = a) = x.handler.metadata in
-  Fmt.pf f "%s@%ld" M.interface x.id
+  Fmt.pf f "%s@%lx" M.interface x.id

@@ -142,16 +142,16 @@ let pop_and_show_arg f t : Metadata.param -> unit = function
   | `Fixed ->
     Fixed.pp f (get_fixed t)
   | `Object None ->
-    Fmt.pf f "%ld" (get_int t)
+    Fmt.pf f "%lx" (get_int t)
   | `New_ID None ->
     let interface = get_string t in
     let version = get_int t in
     let id = get_int t in
-    Fmt.pf f "(%s_%ld)%ld" interface version id
+    Fmt.pf f "(%s_%ld)%lx" interface version id
   | `Object (Some _) ->
-    Fmt.int32 f (get_int t)
+    Fmt.pf f "%lx" (get_int t)
   | `New_ID (Some _) ->
-    Fmt.pf f "+%ld" (get_int t)
+    Fmt.pf f "+%lx" (get_int t)
   | `String ->
     Fmt.(quote string) f (get_string t)
   | `Array ->

@@ -72,7 +72,7 @@ let connect role transport handler =
     role;
     objects = Objects.empty;
     free_ids = [];
-    next_id = 2l;
+    next_id = (match role with `Client -> 2l | `Server -> 0xff000000l);
     incoming_fds = Queue.create ();
     outbox = Queue.create ();
     closed;
