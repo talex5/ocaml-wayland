@@ -3,19 +3,6 @@ open Internal
 
 type 'a t = 'a Internal.connection
 
-let connect role transport handler =
-  let t = {
-    transport;
-    role;
-    objects = Objects.empty;
-    free_ids = [];
-    next_id = 2l;
-    incoming_fds = Queue.create ();
-    outbox = Queue.create ();
-  } in
-  let display_proxy = Proxy.add_root t handler in
-  (t, display_proxy)
-
 (* Dispatch all complete messages in [recv_buffer]. *)
 let rec process_recv_buffer t recv_buffer =
   match Msg.parse ~fds:t.incoming_fds (Recv_buffer.data recv_buffer) with
@@ -47,15 +34,52 @@ let listen t =
   let recv_buffer = Recv_buffer.create 4096 in
   let rec aux () =
     let* (got, fds) = t.transport#recv (Recv_buffer.free_buffer recv_buffer) in
-    List.iter (fun fd -> Queue.add fd t.incoming_fds) fds;
-    if got = 0 then (
-      Log.info (fun f -> f "Got end-of-file on wayland connection");
-      Lwt.return_unit
+    if Lwt.is_sleeping t.closed then (
+      List.iter (fun fd -> Queue.add fd t.incoming_fds) fds;
+      if got = 0 then (
+        Log.info (fun f -> f "Got end-of-file on wayland connection");
+        Lwt.return_unit
+      ) else (
+        Recv_buffer.update_producer recv_buffer got;
+        Log.debug (fun f -> f "Ring after adding %d bytes: %a@." got Recv_buffer.dump recv_buffer);
+        process_recv_buffer t recv_buffer;
+        aux ()
+      )
     ) else (
-      Recv_buffer.update_producer recv_buffer got;
-      Log.debug (fun f -> f "Ring after adding %d bytes: %a@." got Recv_buffer.dump recv_buffer);
-      process_recv_buffer t recv_buffer;
-      aux ()
+      List.iter Unix.close fds;
+      failwith "Connection is closed"
     )
   in
-  aux ()
+  Lwt.try_bind aux
+    (fun () ->
+       if Lwt.is_sleeping t.closed then Lwt.wakeup t.set_closed (Ok ());
+       Queue.iter Unix.close t.incoming_fds;
+       Lwt.return_unit;
+    )
+    (fun ex ->
+       if Lwt.is_sleeping t.closed then
+         Lwt.wakeup t.set_closed (Error ex)
+       else
+         Log.debug (fun f -> f "Listen error (but connection already closed): %a" Fmt.exn ex);
+       Queue.iter Unix.close t.incoming_fds;
+       Lwt.return_unit;
+    )
+
+let connect role transport handler =
+  let closed, set_closed = Lwt.wait () in
+  let t = {
+    transport = (transport :> S.transport);
+    role;
+    objects = Objects.empty;
+    free_ids = [];
+    next_id = 2l;
+    incoming_fds = Queue.create ();
+    outbox = Queue.create ();
+    closed;
+    set_closed;
+  } in
+  let display_proxy = Proxy.add_root t handler in
+  Lwt.async (fun () -> listen t);
+  (t, display_proxy)
+
+let closed t = t.closed

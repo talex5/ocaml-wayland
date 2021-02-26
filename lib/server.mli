@@ -9,3 +9,7 @@ val connect : S.transport -> (([`Wl_registry], [`V1], [`Server]) Proxy.t -> unit
     or using the proxy. *)
 
 val wl_display : t -> [`V1] Wayland_server.Wl_display.t
+
+val closed : t -> (unit, exn) Lwt_result.t
+(** [closed t] resolves when the connection is closed (either due to the other side closing it normally
+    or because an exception was raised. *)

@@ -9,7 +9,9 @@ type 'role connection = {
   mutable free_ids : int32 list;
   mutable next_id : int32;
   incoming_fds : Unix.file_descr Queue.t;
-  outbox : (unit, [`W]) Msg.t Queue.t;   (* The transmit thread is running whenever this is non-empty. *)
+  outbox : (unit, [`W]) Msg.t Queue.t;          (* The transmit thread is running whenever this is non-empty. *)
+  closed : (unit, exn) Lwt_result.t;
+  set_closed : (unit, exn) result Lwt.u;
 } and ('a, 'role) proxy = {
   id : int32;
   conn : 'role connection;
@@ -55,10 +57,28 @@ let rec transmit t =
   else
     transmit t
 
-let enqueue t buf =
-  let start_transmit_thread = Queue.is_empty t.outbox in
-  Queue.add buf t.outbox;
-  if start_transmit_thread then Lwt.async (fun () -> transmit t)
+let cancel_msg (m : (_, [`W]) Msg.t) =
+  Queue.iter Unix.close (Msg.fds m)
+
+let enqueue t msg =
+  if Lwt.is_sleeping t.closed then (
+    let start_transmit_thread = Queue.is_empty t.outbox in
+    Queue.add msg t.outbox;
+    if start_transmit_thread then (
+      Lwt.dont_wait
+        (fun () -> transmit t)
+        (fun ex ->
+           if Lwt.is_sleeping t.closed then (
+             Lwt.wakeup_exn t.set_closed ex;
+           ) else
+             Log.debug (fun f -> f "Transmit failed (but connection already closed): %a" Fmt.exn ex);
+           Queue.iter cancel_msg t.outbox
+        )
+    )
+  ) else (
+    cancel_msg msg;
+    failwith "Connection has been closed"
+  )
 
 let pp_proxy f (type a) (x: (a, _) proxy) =
   let (module M : Metadata.S with type t = a) = x.handler.metadata in

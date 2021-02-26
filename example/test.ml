@@ -58,7 +58,11 @@ let () =
   Lwt_main.run begin
     (* Connect to the server. *)
     let* transport = Wayland.Unix_transport.connect () in
-    let display = Wayland.Display.connect transport in
+    let display, conn_closed = Wayland.Display.connect transport in
+    Lwt.on_success conn_closed (function
+        | Ok () -> ()
+        | Error ex -> raise ex
+      );
     (* Get the registry and find the objects we need. *)
     let* reg = Registry.of_display display in
     let compositor = Registry.bind reg (Wl_compositor.v4 ()) in

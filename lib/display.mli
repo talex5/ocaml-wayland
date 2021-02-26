@@ -2,10 +2,12 @@
 
 type t
 
-val connect : S.transport -> t
+val connect : #S.transport -> t * (unit, exn) Lwt_result.t
 (** [connect transport] runs the Wayland protocol over [transport]
     (typically created with {!Unix_transport.connect}).
-    It spawns a background thread to handle incoming messages. *)
+    It spawns a background thread to handle incoming messages.
+    It returns the new connection and a promise that resolves when
+    the connection ends. *)
 
 val sync : t -> unit Lwt.t
 (** Send a sync message to the server and wait for the reply.

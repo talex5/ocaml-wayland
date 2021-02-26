@@ -27,7 +27,12 @@ let of_socket socket = object (_ : S.transport)
   method recv { Cstruct.buffer; off; len } =
     let io_vectors = Lwt_unix.IO_vectors.create () in
     Lwt_unix.IO_vectors.append_bigarray io_vectors buffer off len;
-    Lwt_unix.recv_msg ~socket ~io_vectors
+    Lwt.catch
+      (fun () -> Lwt_unix.recv_msg ~socket ~io_vectors)
+      (function
+        | Unix.Unix_error(Unix.ECONNRESET, _, _) -> Lwt.return (0, [])
+        | ex -> Lwt.fail ex
+      )
 end
 
 let connect () =

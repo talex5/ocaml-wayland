@@ -79,7 +79,7 @@ module S = struct
       next_surface = 1;
       log = [];
     } in
-    let _ : Server.t =
+    let s : Server.t =
       Server.connect socket (fun reg ->
           Proxy.Handler.attach reg @@ Wl_registry.v1 @@ object
             method on_bind : type a. _ -> name:int32 -> (a, [`Unknown], _) Proxy.t -> unit =
@@ -92,14 +92,25 @@ module S = struct
           end;
           Wl_registry.global reg ~name:comp_name ~interface:"wl_compositor" ~version:1l
         )
-    in t
+    in
+    Lwt.async (fun () ->
+        let open Lwt.Infix in
+        Server.closed s >>= function
+        | Ok () -> Lwt.return_unit
+        | Error ex -> raise ex
+      );
+    t
 
   let get_log t = List.rev t.log
 end
 
 let test_simple _ () =
   let socket_c, socket_s = Lwt_unix.(socketpair PF_UNIX SOCK_STREAM 0) in
-  let c = Unix_transport.of_socket socket_c |> Display.connect in
+  let c, conn_closed = Unix_transport.of_socket socket_c |> Display.connect in
+  Lwt.on_success conn_closed (function
+      | Ok () -> ()
+      | Error ex -> raise ex
+    );
   let server = Unix_transport.of_socket socket_s |> S.connect in
   let open Wayland.Wayland_client in
   let* reg = Registry.of_display c in

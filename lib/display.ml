@@ -14,8 +14,7 @@ let connect transport =
         Proxy.delete_other proxy id
     end
   in
-  Lwt.async (fun () -> Connection.listen conn);
-  { conn; wl_display }
+  { conn; wl_display }, Connection.closed conn
 
 let sync t =
   let result, set_result = Lwt.wait () in

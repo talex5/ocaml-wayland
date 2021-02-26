@@ -20,7 +20,8 @@ let connect transport registry =
         Proxy.delete cb
     end
   in
-  Lwt.async (fun () -> Connection.listen conn);
   { conn; wl_display }
 
 let wl_display t = t.wl_display
+
+let closed t = Connection.closed t.conn
