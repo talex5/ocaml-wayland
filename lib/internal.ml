@@ -19,7 +19,8 @@ type 'role connection = {
   version : int32;
   on_delete : (unit -> unit) Queue.t;
   mutable handler : ('a, 'role) handler;
-  mutable valid : bool;
+  mutable can_send : bool;  (* False once we've called a destructor *)
+  mutable can_recv : bool;  (* False once the peer has called a destructor. *)
 }
 and 'role generic_proxy = Generic : ('a, 'role) proxy -> 'role generic_proxy
 and ('a, 'role) handler = {

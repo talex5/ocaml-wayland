@@ -15,9 +15,13 @@ let rec process_recv_buffer t recv_buffer =
       | Some (Generic proxy) ->
         let msg = Msg.cast msg in
         t.trace.inbound proxy msg;
-        proxy.handler.dispatch proxy msg
+        if proxy.can_recv then
+          proxy.handler.dispatch proxy msg
+        else
+          Fmt.failwith "Received message for %a, which was shut down!" pp_proxy proxy
     end;
     Recv_buffer.update_consumer recv_buffer (Msg.length msg);
+    (* Unix.sleepf 0.001; *)
     (* Fmt.pr "Buffer after dispatch: %a@." Recv_buffer.dump recv_buffer; *)
     process_recv_buffer t recv_buffer
 

@@ -27,9 +27,9 @@ val interface : _ t -> string
 
 (** {2 Lifecycle} *)
 
-val delete : (_, _, [`Server]) t -> unit
-(** [delete t] sends a delete event from object 1 and removes [t] from the
-    object table. This is only used in server code. *)
+val delete : (_, _, [< `Client | `Server]) t -> unit
+(** [delete t] removes [t] from the object table.
+    For servers, it also sends a delete event from object 1 if the object was client-allocated. *)
 
 val on_delete : (_, _, _) t -> (unit -> unit) -> unit
 (** [on_delete t f] calls [f] when [t] is deleted, either by [delete] being called (on the server)
@@ -143,11 +143,15 @@ val spawn_bind : (_, _, [< `Client | `Server ] as 'role) t -> ('a, 'v, 'role) Se
     not inherited from the parent.
     This is used for binding with the global registry. *)
 
-val invalidate : _ t -> unit
-(** [invalidate t] flags the proxy as no longer valid.
-    Call this after calling a destructor method to prevent accidentally
-    trying to use it again.
-    Attempts to use the proxy after this will fail. *)
+val shutdown_send : _ t -> unit
+(** [shutdown_send t] indicates that you will no longer call [send] on [t].
+    Call this after sending a destructor message.
+    Attempts to send using the proxy after this will fail. *)
+
+val shutdown_recv : _ t -> unit
+(** [shutdown_recv t] indicates that we will no longer receive messages
+    addressed to [t].
+    Call this after receiving a destructor message. *)
 
 val unknown_event : int -> string
 (** A suitable string to display for an unknown event number. *)
