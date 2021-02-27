@@ -5,8 +5,34 @@ type t = {
   wl_display : [`V1] Wl_display.t;
 }
 
-let connect transport =
-  let conn, wl_display = Connection.connect `Client transport @@ Wl_display.v1 @@ object
+module type TRACE = Proxy.TRACE with type role = [`Client]
+
+module Trace : TRACE = struct
+  type role = [`Client]
+
+  let inbound (type a) (proxy : (a, _, _) Proxy.t) msg =
+    Log.info (fun f ->
+        let (module M : Metadata.S with type t = a) = Proxy.metadata proxy in
+        let msg_name, arg_info = M.events (Msg.op msg) in
+        f "@[<h><- %a.%s %a@]"
+          Proxy.pp proxy
+          msg_name
+          (Msg.pp_args arg_info) msg
+      )
+
+  let outbound (type a) (proxy : (a, _, _) Proxy.t) msg =
+    Log.info (fun f ->
+        let (module M) = Proxy.metadata proxy in
+        let msg_name, arg_info = M.requests (Msg.op msg) in
+        f "@[<h>-> %a.%s %a@]"
+                 Proxy.pp proxy
+                 msg_name
+                 (Msg.pp_args arg_info) msg
+      )
+end
+
+let connect ?(trace=(module Trace : TRACE)) transport =
+  let conn, wl_display = Connection.connect ~trace `Client transport @@ Wl_display.v1 @@ object
       method on_error _ ~object_id ~code ~message =
         Log.err (fun f -> f "Received Wayland error: %ld %S on object %ld" code message object_id)
 

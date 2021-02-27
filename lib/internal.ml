@@ -12,6 +12,7 @@ type 'role connection = {
   outbox : (unit, [`W]) Msg.t Queue.t;          (* The transmit thread is running whenever this is non-empty. *)
   closed : (unit, exn) Lwt_result.t;
   set_closed : (unit, exn) result Lwt.u;
+  trace : 'role tracer;
 } and ('a, 'role) proxy = {
   id : int32;
   conn : 'role connection;
@@ -25,6 +26,10 @@ and ('a, 'role) handler = {
   user_data : ('a, 'role) S.user_data;
   metadata : (module Metadata.S with type t = 'a);
   dispatch : ('a, 'role) proxy -> ('a, [`R]) Msg.t -> unit;
+}
+and 'role tracer = {
+  outbound : 'a. ('a, 'role) proxy -> ('a, [`W]) Msg.t -> unit;
+  inbound : 'a. ('a, 'role) proxy -> ('a, [`R]) Msg.t -> unit;
 }
 
 let get_unused_id t =

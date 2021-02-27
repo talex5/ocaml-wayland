@@ -1,6 +1,7 @@
 type 'a t
 
 val connect :
+  trace:(module Proxy.TRACE with type role = 'role) ->
   ([< `Client | `Server] as 'role) ->
   #S.transport ->
   ('a, 'v, 'role) Proxy.Service_handler.t ->

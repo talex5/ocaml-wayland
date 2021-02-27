@@ -1,3 +1,5 @@
+(** {2 Types} *)
+
 type ('a, +'v, 'role) t
 (** An [('a, 'v, 'role) t] is a proxy used by ['role] to send messages to an object with interface ['a] and version in ['v]. *)
 
@@ -22,6 +24,8 @@ val metadata : ('a, _, 'role) t -> (module Metadata.S with type t = 'a)
 val ty : ('a, _, 'role) t -> 'a Metadata.ty
 
 val interface : _ t -> string
+
+(** {2 Lifecycle} *)
 
 val delete : (_, _, [`Server]) t -> unit
 (** [delete t] sends a delete event from object 1 and removes [t] from the
@@ -151,6 +155,15 @@ val unknown_event : int -> string
 val unknown_request : int -> string
 (** A suitable string to display for an unknown request number. *)
 
+(** {2 Logging and tracing} *)
+
+(** Pass a [TRACE] module when connecting to trace protocol messages. *)
+module type TRACE = sig
+  type role
+  val outbound : ('a, 'v, role) t -> ('a, [`W]) Msg.t -> unit
+  val inbound : ('a, 'v, role) t -> ('a, [`R]) Msg.t -> unit
+end
+
 val pp : _ t Fmt.t
 
 (**/**)
@@ -167,3 +180,5 @@ val lookup_other : (_, _, 'role) t -> int32 -> (_, 'role) generic
 
 val wrong_type : parent:_ t -> expected:string -> _ t -> 'a
 (** [wrong_type ~parent ~expected t] fails with an exception complaining that [t] should have type [expected]. *)
+
+val trace : (module TRACE with type role = 'role) -> 'role Internal.tracer

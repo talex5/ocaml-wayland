@@ -13,18 +13,9 @@ let rec process_recv_buffer t recv_buffer =
       match Objects.find_opt obj t.objects with
       | None -> Fmt.failwith "No such object %ld" obj
       | Some (Generic proxy) ->
-        Log.info (fun f ->
-            let (module M) = proxy.handler.metadata in
-            let msg_name, arg_info =
-              match t.role with
-              | `Client -> M.events (Msg.op msg)
-              | `Server -> M.requests (Msg.op msg)
-            in
-            f "@[<h><- %a.%s %a@]"
-              pp_proxy proxy
-              msg_name
-              (Msg.pp_args arg_info) msg);
-        proxy.handler.dispatch proxy (Msg.cast msg)
+        let msg = Msg.cast msg in
+        t.trace.inbound proxy msg;
+        proxy.handler.dispatch proxy msg
     end;
     Recv_buffer.update_consumer recv_buffer (Msg.length msg);
     (* Fmt.pr "Buffer after dispatch: %a@." Recv_buffer.dump recv_buffer; *)
@@ -65,7 +56,7 @@ let listen t =
        Lwt.return_unit;
     )
 
-let connect role transport handler =
+let connect ~trace role transport handler =
   let closed, set_closed = Lwt.wait () in
   let t = {
     transport = (transport :> S.transport);
@@ -77,6 +68,7 @@ let connect role transport handler =
     outbox = Queue.create ();
     closed;
     set_closed;
+    trace = Proxy.trace trace;
   } in
   let display_proxy = Proxy.add_root t handler in
   Lwt.async (fun () -> listen t);

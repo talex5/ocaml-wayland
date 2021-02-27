@@ -2,7 +2,10 @@
 
 type t
 
-val connect : #S.transport -> t * (unit, exn) Lwt_result.t
+module type TRACE = Proxy.TRACE with type role = [`Client]
+
+val connect : ?trace:(module TRACE) ->
+  #S.transport -> t * (unit, exn) Lwt_result.t
 (** [connect transport] runs the Wayland protocol over [transport]
     (typically created with {!Unix_transport.connect}).
     It spawns a background thread to handle incoming messages.

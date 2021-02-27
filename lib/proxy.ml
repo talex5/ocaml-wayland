@@ -6,6 +6,12 @@ type ('a, 'v, 'role) proxy = ('a, 'v, 'role) t
 
 type ('v, 'role) generic = Proxy : ('a, 'v, 'role) t -> ('v, 'role) generic
 
+module type TRACE = sig
+  type role
+  val outbound : ('a, 'v, role) t -> ('a, [`W]) Msg.t -> unit
+  val inbound : ('a, 'v, role) t -> ('a, [`R]) Msg.t -> unit
+end
+
 let missing_dispatch _ = failwith "no handler registered!"
 
 let missing_handler metadata = {
@@ -105,19 +111,7 @@ let id_opt = function
 let alloc t = Msg.alloc ~obj:t.id
 
 let send (type a) (t:_ t) (msg : (a, [`W]) Msg.t) =
-  Log.info (fun f ->
-      let (module M : Metadata.S with type t = a) = t.handler.metadata in
-      let outgoing_info =
-        match t.conn.role with
-        | `Client -> M.requests
-        | `Server -> M.events
-      in
-      let msg_name, arg_info = outgoing_info (Msg.op msg) in
-      f "@[<h>-> %a.%s %a@]"
-               pp t
-               msg_name
-               (Msg.pp_args arg_info) msg;
-    );
+  t.conn.trace.outbound t msg;
   if t.valid then
     enqueue t.conn (Msg.cast msg)
   else
@@ -182,3 +176,8 @@ let lookup_other (t : _ t) id =
 
 let wrong_type ~parent ~expected t =
   Fmt.failwith "Object %a referenced object %a, which should be of type %S but isn't'" pp parent pp t expected
+
+let trace (type r) (module T : TRACE with type role = r) = {
+  inbound = T.inbound;
+  outbound = T.outbound;
+}

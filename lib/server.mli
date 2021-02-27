@@ -1,6 +1,9 @@
 type t
 
-val connect : S.transport -> ([`Wl_display], [`V1], [`Server]) Proxy.Service_handler.t -> t
+module type TRACE = Proxy.TRACE with type role = [`Server]
+
+val connect : ?trace:(module TRACE) ->
+  S.transport -> ([`Wl_display], [`V1], [`Server]) Proxy.Service_handler.t -> t
 (** [connect transport handler] runs the Wayland protocol over [transport]
     (typically created with {!Unix_transport.of_socket}).
     It spawns a background thread to handle incoming messages. *)
