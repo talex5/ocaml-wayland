@@ -9,6 +9,11 @@
  (action (run %{bin:wayland-scanner-ocaml} --open Wayland.Wayland_proto %{deps})))
 
 (rule
+ (targets gtk_primary_selection_client.ml gtk_primary_selection_server.ml gtk_primary_selection_proto.ml)
+ (deps   gtk-primary-selection.xml)
+ (action (run %{bin:wayland-scanner-ocaml} --open Wayland.Wayland_proto %{deps})))
+
+(rule
  (targets xdg_output_unstable_v1_client.ml xdg_output_unstable_v1_server.ml xdg_output_unstable_v1_proto.ml)
  (deps   xdg-output-unstable-v1.xml)
  (action (run %{bin:wayland-scanner-ocaml} --open Wayland.Wayland_proto %{deps})))
