@@ -98,4 +98,4 @@ let enqueue t msg =
 
 let pp_proxy f (type a) (x: (a, _) proxy) =
   let (module M : Metadata.S with type t = a) = x.handler.metadata in
-  Fmt.pf f "%s@%lx" M.interface x.id
+  Fmt.pf f "%s@%lu" M.interface x.id

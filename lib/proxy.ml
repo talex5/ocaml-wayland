@@ -35,7 +35,7 @@ let accept_new t ~version ~handler id =
     | `Server -> assert (not is_service_allocated_id)
   end;
   if Objects.mem id conn.objects then
-    Fmt.failwith "An object with ID %lx already exists!" id;
+    Fmt.failwith "An object with ID %lu already exists!" id;
   let t' = make_proxy id ~version ~conn ~handler in
   conn.objects <- Objects.add id (Generic t') conn.objects;
   t'
