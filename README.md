@@ -204,19 +204,46 @@ To avoid the exceptions, you just need to ensure that:
 1. You don't extend `Wayland.S.user_data` with any other variants.
 2. You don't forget to attach the data when creating the handler.
 
-## Deleting objects
+## Resource lifetimes
+
+The Wayland spec is a bit vague about object lifecycles.
+This is my guess about how it's supposed to work.
 
 Some message types are marked as "destructors".
 Usually the client sends a destructor request and the server acknowledges it.
 In some cases (e.g. callbacks, which have no requests), the server calls the destructor.
 
-After a client either sends or receives a destructor message,
-the object is marked as invalid and cannot be used for sending further messages.
-However, it can still receive them.
-When the client receives the delete acknowledgement,
-the object is removed from the table and its ID can be reused.
-Unlike other handlers, client destructor handlers do not take a proxy argument since
-the proxy is unusable by this point.
+After sending a destructor message, you cannot reference that object in any further messages.
+Except that the server can call a destructor and then also send a delete event mentioning the same object.
+
+The client cannot reuse an ID until the server has confirmed the deletion,
+since otherwise it wouldn't know whether a new message was for the old or new object.
+
+Only servers can confirm object deletion though,
+so if the server calls a destructor then there has to be some interface-specific method
+for the client to call to confirm the deletion.
+Also, servers only send delete confirmations for IDs the client allocated.
+
+Examples:
+
+1. The client creates a surface. Then it calls `destroy`. The client must no
+   longer send messages to the surface, but continues to receive events about
+   it. When the service sends `delete`, the client can reuse the ID.
+
+2. The client creates a callback. The service calls `done` on it (a destructor),
+   and then immediately sends a `delete` for it.
+   There's no race here because the callback doesn't accept any messages from the client.
+
+3. The server creates data offer. Then it creates another one.
+   This second one implicitly destroys the original.
+   The server must no longer send messages from the original offer, but may receive requests
+   to it from the client.
+   The client responds by calling the `release` method on the old selection.
+   The server does not send any confirmation for that;
+   the `release` is itself the confirmation of the implicit deletion from the `selection` event.
+
+Unlike other handlers, client destructor handlers do not take a proxy argument
+since the proxy is unusable by this point.
 
 On the server side, the handler will normally respond to a destructor call
 by calling `Proxy.delete` immediately.
@@ -227,7 +254,6 @@ until the upstream service has confirmed the deletion too.
 
 - Using `$WAYLAND_SOCKET` to pass an FD doesn't work yet.
 - Version typing for server-side top-level objects needs work.
-- Needs more testing.
 
 [The Wayland Protocol]: https://wayland-book.com/
 [Cap'n Proto RPC]: https://github.com/mirage/capnp-rpc

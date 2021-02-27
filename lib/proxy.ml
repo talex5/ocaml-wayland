@@ -12,6 +12,8 @@ module type TRACE = sig
   val inbound : ('a, 'v, role) t -> ('a, [`R]) Msg.t -> unit
 end
 
+let pp = pp_proxy
+
 let missing_dispatch _ = failwith "no handler registered!"
 
 let missing_handler metadata = {
@@ -19,6 +21,9 @@ let missing_handler metadata = {
   user_data = S.No_data;
   dispatch = missing_dispatch;
 }
+
+let make_proxy ~conn ~version ~handler id =
+  { conn; id; version; can_send = true; can_recv = true; handler; on_delete = Queue.create () }
 
 (* Register [id] as a new object with a temporary dummy handler.
    Call [complete_accept] on the result before blocking. *)
@@ -30,16 +35,14 @@ let accept_new t ~version ~handler id =
     | `Server -> assert (not is_service_allocated_id)
   end;
   if Objects.mem id conn.objects then
-    Fmt.failwith "An object with ID %ld already exists!" id;
-  let t' = { id; version; conn; valid = false; handler; on_delete = Queue.create () } in
+    Fmt.failwith "An object with ID %lx already exists!" id;
+  let t' = make_proxy id ~version ~conn ~handler in
   conn.objects <- Objects.add id (Generic t') conn.objects;
   t'
 
 let complete_accept t handler =
   assert (t.handler.dispatch == missing_dispatch);
-  assert (not t.valid);
-  t.handler <- handler;
-  t.valid <- true
+  t.handler <- handler
 
 let cast_version t = (t : ('a, _, 'role) t :> ('a, _, 'role) t)
 
@@ -73,8 +76,6 @@ module Handler = struct
     complete_accept proxy handler
 end
 
-let pp = pp_proxy
-
 module Service_handler = struct
   type ('a, 'v, 'role) t = {
     handler : ('a, 'v, 'role) Handler.t;
@@ -100,9 +101,7 @@ module Service_handler = struct
     proxy
 end
 
-let id t =
-  assert t.valid;
-  t.id
+let id t = t.id
 
 let id_opt = function
   | None -> 0l
@@ -112,7 +111,7 @@ let alloc t = Msg.alloc ~obj:t.id
 
 let send (type a) (t:_ t) (msg : (a, [`W]) Msg.t) =
   t.conn.trace.outbound t msg;
-  if t.valid then
+  if t.can_send then
     enqueue t.conn (Msg.cast msg)
   else
     Fmt.failwith "Attempt to use object %a after calling destructor!" pp t
@@ -120,7 +119,7 @@ let send (type a) (t:_ t) (msg : (a, [`W]) Msg.t) =
 let spawn_bind t {Service_handler.version; handler } =
   let conn = t.conn in
   let id = get_unused_id conn in
-  let t' = { id; version; conn = t.conn; valid = true; handler; on_delete = Queue.create () } in
+  let t' = make_proxy id ~version ~conn:t.conn ~handler in
   conn.objects <- Objects.add id (Generic t') conn.objects;
   t'
 
@@ -128,13 +127,21 @@ let spawn t handler = spawn_bind t {Service_handler.version = t.version; handler
 
 let user_data (t:_ t) = t.handler.user_data
 
-let invalidate t =
-  assert t.valid;
-  t.valid <- false
+let shutdown_send t =
+  if t.can_send then
+    t.can_send <- false
+  else
+    Fmt.failwith "%a already shut down!" pp t
+
+let shutdown_recv t =
+  if t.can_recv then
+    t.can_recv <- false
+  else
+    Fmt.failwith "%a already shut down!" pp t
 
 let add_root conn { Service_handler.version; handler } =
   assert (version = 1l);
-  let display_proxy = { version; id = 1l; conn; valid = true; handler; on_delete = Queue.create () } in
+  let display_proxy = make_proxy 1l ~version ~conn ~handler in
   conn.objects <- Objects.add display_proxy.id (Generic display_proxy) conn.objects;
   display_proxy
 
@@ -143,16 +150,22 @@ let on_delete t fn =
 
 let delete t =
   let conn = t.conn in
-  assert (conn.role = `Server);
   match Objects.find_opt t.id conn.objects with
   | Some (Generic t') when Obj.repr t == Obj.repr t' ->
-    t.valid <- false;
+    t.can_recv <- false;
+    t.can_send <- false;
     conn.objects <- Objects.remove t.id conn.objects;
     Internal.free_id conn t.id;
-    let Generic display = Objects.find 1l conn.objects in
-    let msg = alloc display ~op:1 ~ints:1 ~strings:[] ~arrays:[] in
-    Msg.add_int msg t.id;
-    send display msg;
+    begin match conn.role with
+      | `Client -> ()
+      | `Server ->
+        if not (id_allocated_by_us conn t.id) then (
+          let Generic display = Objects.find 1l conn.objects in
+          let msg = alloc display ~op:1 ~ints:1 ~strings:[] ~arrays:[] in
+          Msg.add_int msg t.id;
+          send display msg
+        )
+    end;
     Queue.iter (fun f -> f ()) t.on_delete
   | _ -> Fmt.failwith "Object %a is not registered!" pp t
 
@@ -161,7 +174,7 @@ let delete_other proxy id =
   match Objects.find_opt id conn.objects with
   | None -> Fmt.failwith "Object %ld does not exist!" id
   | Some (Generic proxy) ->
-    if proxy.valid then Log.warn (fun f -> f "Object %a deleted while still marked as valid!" pp proxy);
+    proxy.can_recv <- false;
     conn.objects <- Objects.remove id conn.objects;
     Internal.free_id conn id;
     Queue.iter (fun f -> f ()) proxy.on_delete
@@ -172,7 +185,11 @@ let unknown_request = Fmt.strf "<unknown request %d>"
 let lookup_other (t : _ t) id =
   match Objects.find_opt id t.conn.objects with
   | None -> Fmt.failwith "Proxy with ID %ld not found!" id
-  | Some (Generic p) -> Proxy p
+  | Some (Generic p) ->
+    if p.can_recv then
+      Proxy p
+    else
+      Fmt.failwith "Message referred to object %a, which cannot receive further messages" pp p
 
 let wrong_type ~parent ~expected t =
   Fmt.failwith "Object %a referenced object %a, which should be of type %S but isn't'" pp parent pp t expected

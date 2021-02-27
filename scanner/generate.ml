@@ -388,7 +388,7 @@ let make_wrappers ~opens ~internal role (protocol : Protocol.t) f =
                 );
               line "Proxy.send _t _msg";
               if msg.ty = `Destructor then
-                Fmt.pf f ";@,Proxy.invalidate _t";
+                Fmt.pf f ";@,Proxy.shutdown_send _t";
               if new_ids = [] then Fmt.pf f "@]"
               else (
                 Fmt.pf f ";";
@@ -456,8 +456,8 @@ let make_wrappers ~opens ~internal role (protocol : Protocol.t) f =
                         (if arg.allow_null then "_opt" else "");
                   end;
                 );
-              if msg.ty = `Destructor && role = `Client then
-                line "Proxy.invalidate _proxy;";
+              if msg.ty = `Destructor then
+                line "Proxy.shutdown_recv _proxy;";
               line "_handlers#on_%s %s@[%a@]@]"
                 msg.name
                 (if msg.ty = `Normal || role = `Server then "_proxy " else "")
