@@ -45,3 +45,5 @@ let bind t handler =
   if version < handler_version then
     Fmt.failwith "Can't use version %ld of %s; registry only supports <= %ld" handler_version iface version;
   Wl_registry.bind t.registry ~name handler
+
+let wl_registry t = t.registry

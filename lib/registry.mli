@@ -21,3 +21,5 @@ val bind : t -> (('a, 'v, [`Client]) Proxy.Service_handler.t) -> ('a, 'v, [`Clie
 (** [bind t handler] gets the entry for [handler]'s interface,
     checks that the version is compatible, and creates a proxy for it.
     Raises an exception if the interface isn't listed, or has the wrong version. *)
+
+val wl_registry : t -> [`V1] Wayland_client.Wl_registry.t
