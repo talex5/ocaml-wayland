@@ -16,14 +16,14 @@ let pp = pp_proxy
 
 let missing_dispatch _ = failwith "no handler registered!"
 
-let missing_handler metadata = {
-  metadata;
-  user_data = S.No_data;
-  dispatch = missing_dispatch;
-}
+let missing_handler metadata = object (_ : _ handler)
+  method metadata = metadata
+  method user_data = S.No_data
+  method dispatch = missing_dispatch
+end
 
 let make_proxy ~conn ~version ~handler id =
-  { conn; id; version; can_send = true; can_recv = true; handler; on_delete = Queue.create () }
+  { conn; id; version; can_send = true; can_recv = true; handler = (handler :> _ handler); on_delete = Queue.create () }
 
 (* Register [id] as a new object with a temporary dummy handler.
    Call [complete_accept] on the result before blocking. *)
@@ -41,14 +41,14 @@ let accept_new t ~version ~handler id =
   t'
 
 let complete_accept t handler =
-  assert (t.handler.dispatch == missing_dispatch);
+  (*   assert (t.handler.dispatch == missing_dispatch); *)
   t.handler <- handler
 
 let cast_version t = (t : ('a, _, 'role) t :> ('a, _, 'role) t)
 
 let version t = t.version
 
-let metadata t = t.handler.metadata
+let metadata t = t.handler#metadata
 
 let ty (type a) t =
   let (module M : Metadata.S with type t = a) = metadata t in
@@ -59,45 +59,60 @@ let interface (type a) t =
   M.interface
 
 module Handler = struct
-  type ('a, 'v, 'role) t = ('a, 'role) Internal.handler
+  class type ['a, 'v, 'role] t = object
+    method user_data : ('a, 'role) S.user_data
+    method metadata : (module Metadata.S with type t = 'a)
+    method dispatch : ('a, 'v, 'role) proxy -> ('a, [`R]) Msg.t -> unit
+  end
 
-  let interface (type a) t =
-    let (module M : Metadata.S with type t = a) = t.metadata in
+  let interface (type a) (t : (_, _ ,_) #t) =
+    let (module M : Metadata.S with type t = a) = t#metadata in
     M.interface
 
   let cast_version t = (t :> _ t)
 
-  let v ?(user_data=S.No_data) metadata dispatch = { metadata; dispatch; user_data }
+  let v ?(user_data=S.No_data) metadata dispatch = 
+    object
+      method metadata = metadata
+      method dispatch = dispatch
+      method user_data = user_data
+    end
 
   let accept_new (type a) proxy (module M : Metadata.S with type t = a) id =
     accept_new proxy id ~version:proxy.version ~handler:(missing_handler (module M))
 
   let attach proxy handler =
-    complete_accept proxy handler
+    complete_accept proxy (handler :> _ handler)
 end
 
 module Service_handler = struct
-  type ('a, 'v, 'role) t = {
-    handler : ('a, 'v, 'role) Handler.t;
-    version : int32;
-  }
+  class type ['a, 'v, 'role] t = object
+    inherit ['a, 'v, 'role] Handler.t
+    method version : int32
+  end
 
-  let interface t = Handler.interface t.handler
+  let interface t = Handler.interface t
 
-  let version t = t.version
+  let version t = t#version
 
   let cast_version t = (t :> _ t)
 
   let v ~version ?user_data metadata h =
-    { version; handler = Handler.v ?user_data metadata h }
+    let handler = Handler.v ?user_data metadata h in
+    object
+      method metadata = handler#metadata
+      method dispatch = handler#dispatch
+      method user_data = handler#user_data
+      method version = version
+    end
 
   let accept_new (type a) proxy id (module M : Metadata.S with type t = a) ~version : (a, [`Unknown], _) proxy =
     accept_new proxy id ~version ~handler:(missing_handler (module M))
 
-  let attach (type a) (proxy : (a, _, _) proxy) { handler; version } =
-    if proxy.version <> version then
-      Fmt.invalid_arg "attach: expected %a to have version %ld, but got a handler for %ld" pp proxy proxy.version version;
-    complete_accept proxy handler;
+  let attach (type a) (proxy : (a, _, _) proxy) (t:(_, _, _) #t) =
+    if proxy.version <> t#version then
+      Fmt.invalid_arg "attach: expected %a to have version %ld, but got a handler for %ld" pp proxy proxy.version t#version;
+    complete_accept proxy (t :> _ handler);
     proxy
 end
 
@@ -116,16 +131,21 @@ let send (type a) (t:_ t) (msg : (a, [`W]) Msg.t) =
   else
     Fmt.failwith "Attempt to use object %a after calling destructor!" pp t
 
-let spawn_bind t {Service_handler.version; handler } =
+let spawn_bind t (handler : (_, _, _) #Service_handler.t) =
   let conn = t.conn in
   let id = get_unused_id conn in
-  let t' = make_proxy id ~version ~conn:t.conn ~handler in
+  let t' = make_proxy id ~version:handler#version ~conn:t.conn ~handler:(handler :> _ handler) in
   conn.objects <- Objects.add id (Generic t') conn.objects;
   t'
 
-let spawn t handler = spawn_bind t {Service_handler.version = t.version; handler}
+let spawn t (handler : (_, _, _) #Handler.t) =
+  let conn = t.conn in
+  let id = get_unused_id conn in
+  let t' = make_proxy id ~version:t.version ~conn:t.conn ~handler in
+  conn.objects <- Objects.add id (Generic t') conn.objects;
+  t'
 
-let user_data (t:_ t) = t.handler.user_data
+let user_data (t:_ t) = t.handler#user_data
 
 let shutdown_send t =
   if t.can_send then
@@ -139,9 +159,9 @@ let shutdown_recv t =
   else
     Fmt.failwith "%a already shut down!" pp t
 
-let add_root conn { Service_handler.version; handler } =
-  assert (version = 1l);
-  let display_proxy = make_proxy 1l ~version ~conn ~handler in
+let add_root conn (handler : (_, _, _) #Service_handler.t) =
+  assert (handler#version = 1l);
+  let display_proxy = make_proxy 1l ~version:handler#version ~conn ~handler in
   conn.objects <- Objects.add display_proxy.id (Generic display_proxy) conn.objects;
   display_proxy
 

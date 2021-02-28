@@ -41,7 +41,11 @@ val on_delete : (_, _, _) t -> (unit -> unit) -> unit
     Instead, run wayland-scanner-ocaml to generate typed wrappers and use the wrappers instead. *)
 
 module Handler : sig
-  type ('a, 'v, 'role) t
+  class type ['a, 'v, 'role] t = object
+    method user_data : ('a, 'role) S.user_data
+    method metadata : (module Metadata.S with type t = 'a)
+    method dispatch : ('a, 'v, 'role) proxy -> ('a, [`R]) Msg.t -> unit
+  end
   (** An [('a, 'v) t] handles incoming messages for an object of type ['a].
       Typically, a constructor will let the user pick from a range of versions
       for ['v], which will then be constrained by the [spawn] call. *)
@@ -69,13 +73,16 @@ module Handler : sig
       The resulting proxy is in a half-initialised state.
       You must call {!attach} on it before switching threads or doing anything else with it. *)
 
-  val attach : ('a, 'v, 'role) proxy -> ('a, 'v, 'role) t -> unit
+  val attach : ('a, 'v, 'role) proxy -> ('a, 'v, 'role) #t -> unit
   (** [attach proxy t] sets [t] as the handler for [proxy],
       which must be a partly initialised proxy returned by [accept_new]. *)
 end
 
 module Service_handler : sig
-  type ('a, 'v, 'role) t
+  class type ['a, 'v, 'role] t = object
+    inherit ['a, 'v, 'role] Handler.t
+    method version : int32
+  end
   (** An [('a, 'v) t] handles incoming messages for a service object of type ['a].
       The difference between services and other objects is that a service gets its version at runtime
       from the bind request, whereas other objects inherit their version from their parent. *)
@@ -92,10 +99,10 @@ module Service_handler : sig
         @param version The version to request in the bind call.
         @param user_data Extra data to be attached to the proxy. *)
 
-  val interface : _ t -> string
+  val interface : (_, _, _) #t -> string
   (** [interface t] is the interface from [t]'s metadata. *)
 
-  val version : _ t -> int32
+  val version : (_, _, _) #t -> int32
   (** [version t] is the version from [t]. *)
 
   val cast_version : ('a, _, 'role) t -> ('a, _, 'role) t
@@ -114,7 +121,7 @@ module Service_handler : sig
       since otherwise processing a message addressed to the new object will fail.
       This is called from the generated code; the user code then calls the result. *)
 
-  val attach : ('a, [`Unknown], 'role) proxy -> ('a, 'v, 'role) t -> ('a, 'v, 'role) proxy
+  val attach : ('a, [`Unknown], 'role) proxy -> ('a, 'v, 'role) #t -> ('a, 'v, 'role) proxy
   (** [attach proxy t] sets [t] as the handler for [proxy],
       which must be a partly initialised proxy returned by [accept_new].
       It returns the proxy with its version cast to the handler's version. *)
@@ -134,11 +141,11 @@ val alloc : ('a, _, _) t -> op:int -> ints:int -> strings:string option list -> 
 val send : ('a, _, [< `Client | `Server ]) t -> ('a, [`W]) Msg.t -> unit
 (** [send t msg] enqueues [msg] on [t]'s connection. *)
 
-val spawn : (_, 'v, [< `Client | `Server ] as 'role) t -> ('a, 'v, 'role) Handler.t -> ('a, 'v, 'role) t
+val spawn : (_, 'v, [< `Client | `Server ] as 'role) t -> ('a, 'v, 'role) #Handler.t -> ('a, 'v, 'role) t
 (** Create a new proxy on [t]'s connection with an unused ID.
     The new object has the same version as its parent. *)
 
-val spawn_bind : (_, _, [< `Client | `Server ] as 'role) t -> ('a, 'v, 'role) Service_handler.t -> ('a, 'v, 'role) t
+val spawn_bind : (_, _, [< `Client | `Server ] as 'role) t -> ('a, 'v, 'role) #Service_handler.t -> ('a, 'v, 'role) t
 (** Like [spawn] but the child's version is taken from the handler,
     not inherited from the parent.
     This is used for binding with the global registry. *)
@@ -172,7 +179,7 @@ val pp : _ t Fmt.t
 
 (**/**)
 
-val add_root : 'role Internal.connection -> ('a, 'v, 'role) Service_handler.t -> ('a, 'v, 'role) t
+val add_root : 'role Internal.connection -> ('a, 'v, 'role) #Service_handler.t -> ('a, 'v, 'role) t
 (** [add_root conn h] sets [h] as the handler for object 1. *)
 
 val delete_other : (_, _, [`Client]) t -> int32 -> unit

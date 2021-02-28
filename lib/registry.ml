@@ -22,8 +22,8 @@ let remove db ~name =
 
 let of_display d =
   let db = Hashtbl.create 20 in
-  let registry = Wl_display.get_registry (Display.wl_display d) @@
-    Wl_registry.v1 @@ object
+  let registry = Wl_display.get_registry (Display.wl_display d) @@ object
+      inherit [_] Wl_registry.handlers
       method on_global _ = add db
       method on_global_remove _ = remove db
     end

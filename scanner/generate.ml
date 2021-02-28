@@ -1,10 +1,5 @@
 open Schema
 
-let rec list_last = function
-  | [] -> assert false
-  | [x] -> x
-  | _ :: xs -> list_last xs
-
 let module_name = String.capitalize_ascii
 
 let full_module_name (proto : Protocol.t) (iface : Interface.t) =
@@ -109,7 +104,7 @@ let pp_args ~role ~with_types =
       Fmt.pf f "(%s:(%a, _, %a) Proxy.t%s)" m pp_poly interface pp_role role
         (if arg.allow_null then " option" else "")
     | `New_ID (Some interface) when with_types ->
-      Fmt.pf f "(%s:(%a, 'v, %a) Proxy.Handler.t)" m pp_poly interface pp_role role
+      Fmt.pf f "(%s:(%a, 'v, %a) #Proxy.Handler.t)" m pp_poly interface pp_role role
     | _ ->
       Fmt.pf f "%s" m
   in
@@ -319,6 +314,7 @@ let make_wrappers ~opens ~internal role (protocol : Protocol.t) f =
     line "module Msg = Wayland.Msg";
     line "module Fixed = Wayland.Fixed";
     line "module Iface_reg = Wayland.Iface_reg";
+    line "module S = Wayland.S";
   );
   line "";
   protocol.interfaces |> List.iter (fun (iface : Interface.t) ->
@@ -414,87 +410,88 @@ let make_wrappers ~opens ~internal role (protocol : Protocol.t) f =
             );
           Fmt.pf f "@]@,end";
           line "";
-          line "(**/**)";
-          line "@[<v2>let _handle_v%d (_handlers:_ #h%d) _proxy _msg =" version version;
-          line "match Msg.op _msg with";
-          msgs_in |> List.iter (fun (i, (msg : Message.t)) ->
-              line "@[<v2>| %d ->" i;
-              msg.args |> List.iteri (fun i (arg : Arg.t) ->
-                  let m = mangle arg.name in
-                  begin match arg.ty with
-                    | `Int | `Uint when arg.enum <> None ->
-                      line "@[<v2>let %s = Msg.get_int _msg |> %a.of_int32 in@]" m (pp_enum_module protocol iface) arg
-                    | `New_ID None ->
-                      line "let (module M%d : Metadata.S) = Msg.get_string _msg |> Iface_reg.lookup in" i;
-                      line "@[<v2>let %s =" m;
-                      line "let version = Msg.get_int _msg in";
-                      line "let id = Msg.get_int _msg in";
-                      line "Proxy.Service_handler.accept_new _proxy id (module M%d) ~version@]@,in" i;
-                    | `New_ID (Some i) ->
-                      line "@[<v2>let %s : (%a, _, _) Proxy.t =@ Msg.get_int _msg |> Proxy.Handler.accept_new _proxy (module Imports.%s) in@]"
-                        m pp_poly i
-                        (module_name i)
-                    | `Object (Some i) when arg.allow_null ->
-                      line "@[<v2>let %s : (%a, _, _) Proxy.t option =" m pp_poly i;
-                      line "match Msg.get_int _msg with";
-                      line "| 0l -> None";
-                      line "@[<v2>| id ->";
-                      line "let Proxy.Proxy p = Proxy.lookup_other _proxy id in";
-                      line "match Proxy.ty p with";
-                      line "| Imports.%s.T -> Some p" (module_name i);
-                      line "| _ -> Proxy.wrong_type ~parent:_proxy ~expected:%S p@]" i;
-                      line "in@]"
-                    | `Object (Some i) ->
-                      line "@[<v2>let %s : (%a, _, _) Proxy.t =" m pp_poly i;
-                      line "let Proxy.Proxy p = Msg.get_int _msg |> Proxy.lookup_other _proxy in";
-                      line "match Proxy.ty p with";
-                      line "| Imports.%s.T -> p" (module_name i);
-                      line "| _ -> Proxy.wrong_type ~parent:_proxy ~expected:%S p" i;
-                      line "in@]"
-                    | _ ->
-                      line "@[<v2>let %s = Msg.get_%a%s _msg in@]" m pp_type_getter arg.ty
-                        (if arg.allow_null then "_opt" else "");
-                  end;
-                );
-              if msg.ty = `Destructor then
-                line "Proxy.shutdown_recv _proxy;";
-              line "_handlers#on_%s %s@[%a@]@]"
-                msg.name
-                (if msg.ty = `Normal || role = `Server then "_proxy " else "")
-                (pp_args ~role ~with_types:false) msg.args;
-            );
-          if version > 1 then
-            line "| _ -> _handle_v%d _handlers _proxy _msg@]" !prev_version
-          else
-            line "| _ -> assert false@]";
-          line "(**/**)";
-          line "";
-          group.versions |> List.iter (fun minor_version ->
-              let end_group = list_last group.versions in
-              if !have_incoming then (
-                line "@[<v2>let v%d ?user_data (handlers:'v h%d)" minor_version version;
-              ) else (
-                line "@[<v2>let v%d ?user_data ()" minor_version;
-              );
-              if is_service then (
-                Fmt.pf f " : (%a, [> `V%d], %a) Proxy.Service_handler.t = Proxy.Service_handler.v"
-                  pp_poly iface.name minor_version pp_role role;
-                line "~version:%dl" minor_version;
-              ) else (
-                Fmt.pf f " : (%a, [< %a], %a) Proxy.Handler.t = Proxy.Handler.v"
-                  pp_poly iface.name pp_versions (1, end_group) pp_role role;
-              );
-              line "?user_data";
-              line "(module %s)" (full_module_name protocol iface);
-              if !have_incoming then (
-                line "(_handle_v%d handlers)" version
-              ) else (
-                line "(_handle_v%d (object end))" version
-              );
-              Fmt.pf f "@]";
-            );
           prev_version := version
         );
+      (* Handlers *)
+      let msgs_in, _msgs_out =
+        match role with
+        | `Client -> iface.events, iface.requests
+        | `Server -> iface.requests, iface.events
+      in
+      line "@[<v2>class %s['v] handlers "
+        (if msgs_in <> [] then "virtual " else "");
+      if is_service then (
+        Fmt.pf f "~version =@ object (_self : (%a, 'v, %a) #Proxy.Service_handler.t)"
+          pp_poly iface.name pp_role role;
+        line "method version = version";
+      ) else (
+        Fmt.pf f "=@ object (_self : (%a, 'v, %a) #Proxy.Handler.t)"
+          pp_poly iface.name pp_role role;
+      );
+      line "method user_data = S.No_data";
+      line "method metadata = (module %s)" (full_module_name protocol iface);
+      line "";
+      msgs_in |> List.iter (fun (msg : Message.t) ->
+          let next_tvar = ref 0 in
+          let args = Fmt.strf "@[%a@]" (pp_sig ~role ~next_tvar protocol iface) msg.args in
+          line "method virtual on_%s : @[%a@]%s %s"
+            msg.name pp_tvars !next_tvar
+            (if msg.ty = `Normal || role = `Server then "'v t ->" else "")
+            args;
+          comment f msg.description;
+          Fmt.cut f ()
+        );
+      line "";
+      line "@[<v2>method dispatch _proxy _msg =";
+      line "match Msg.op _msg with";
+      msgs_in |> List.iteri (fun i (msg : Message.t) ->
+          line "@[<v2>| %d ->" i;
+          msg.args |> List.iteri (fun i (arg : Arg.t) ->
+              let m = mangle arg.name in
+              begin match arg.ty with
+                | `Int | `Uint when arg.enum <> None ->
+                  line "@[<v2>let %s = Msg.get_int _msg |> %a.of_int32 in@]" m (pp_enum_module protocol iface) arg
+                | `New_ID None ->
+                  line "let (module M%d : Metadata.S) = Msg.get_string _msg |> Iface_reg.lookup in" i;
+                  line "@[<v2>let %s =" m;
+                  line "let version = Msg.get_int _msg in";
+                  line "let id = Msg.get_int _msg in";
+                  line "Proxy.Service_handler.accept_new _proxy id (module M%d) ~version@]@,in" i;
+                | `New_ID (Some i) ->
+                  line "@[<v2>let %s : (%a, _, _) Proxy.t =@ Msg.get_int _msg |> Proxy.Handler.accept_new _proxy (module Imports.%s) in@]"
+                    m pp_poly i
+                    (module_name i)
+                | `Object (Some i) when arg.allow_null ->
+                  line "@[<v2>let %s : (%a, _, _) Proxy.t option =" m pp_poly i;
+                  line "match Msg.get_int _msg with";
+                  line "| 0l -> None";
+                  line "@[<v2>| id ->";
+                  line "let Proxy.Proxy p = Proxy.lookup_other _proxy id in";
+                  line "match Proxy.ty p with";
+                  line "| Imports.%s.T -> Some p" (module_name i);
+                  line "| _ -> Proxy.wrong_type ~parent:_proxy ~expected:%S p@]" i;
+                  line "in@]"
+                | `Object (Some i) ->
+                  line "@[<v2>let %s : (%a, _, _) Proxy.t =" m pp_poly i;
+                  line "let Proxy.Proxy p = Msg.get_int _msg |> Proxy.lookup_other _proxy in";
+                  line "match Proxy.ty p with";
+                  line "| Imports.%s.T -> p" (module_name i);
+                  line "| _ -> Proxy.wrong_type ~parent:_proxy ~expected:%S p" i;
+                  line "in@]"
+                | _ ->
+                  line "@[<v2>let %s = Msg.get_%a%s _msg in@]" m pp_type_getter arg.ty
+                    (if arg.allow_null then "_opt" else "");
+              end;
+            );
+          if msg.ty = `Destructor then
+            line "Proxy.shutdown_recv _proxy;";
+          line "_self#on_%s %s@[%a@]@]"
+            msg.name
+            (if msg.ty = `Normal || role = `Server then "_proxy " else "")
+            (pp_args ~role ~with_types:false) msg.args;
+        );
+      line "| _ -> assert false@]";
+      Fmt.pf f "@]@,end";
       Fmt.pf f "@]@,end"; (* Interface *)
     )
 

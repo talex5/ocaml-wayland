@@ -32,7 +32,9 @@ module Trace : TRACE = struct
 end
 
 let connect ?(trace=(module Trace : TRACE)) transport =
-  let conn, wl_display = Connection.connect ~trace `Client transport @@ Wl_display.v1 @@ object
+  let conn, wl_display = Connection.connect ~trace `Client transport @@ object
+      inherit [_] Wl_display.handlers ~version:1l
+
       method on_error _ ~object_id ~code ~message =
         Log.err (fun f -> f "Received Wayland error: %ld %S on object %ld" code message object_id)
 
@@ -44,7 +46,8 @@ let connect ?(trace=(module Trace : TRACE)) transport =
 
 let sync t =
   let result, set_result = Lwt.wait () in
-  let _ : _ Wl_callback.t = Wl_display.sync t.wl_display @@ Wl_callback.v1 @@ object
+  let _ : _ Wl_callback.t = Wl_display.sync t.wl_display @@ object
+      inherit [_] Wl_callback.handlers
       method on_done ~callback_data:_ = Lwt.wakeup set_result ()
     end
   in

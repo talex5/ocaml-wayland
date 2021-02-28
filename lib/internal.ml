@@ -23,11 +23,11 @@ type 'role connection = {
   mutable can_recv : bool;  (* False once the peer has called a destructor. *)
 }
 and 'role generic_proxy = Generic : ('a, 'role) proxy -> 'role generic_proxy
-and ('a, 'role) handler = {
+and ('a, 'role) handler = <
   user_data : ('a, 'role) S.user_data;
   metadata : (module Metadata.S with type t = 'a);
   dispatch : ('a, 'role) proxy -> ('a, [`R]) Msg.t -> unit;
-}
+>
 and 'role tracer = {
   outbound : 'a. ('a, 'role) proxy -> ('a, [`W]) Msg.t -> unit;
   inbound : 'a. ('a, 'role) proxy -> ('a, [`R]) Msg.t -> unit;
@@ -97,5 +97,5 @@ let enqueue t msg =
   )
 
 let pp_proxy f (type a) (x: (a, _) proxy) =
-  let (module M : Metadata.S with type t = a) = x.handler.metadata in
+  let (module M : Metadata.S with type t = a) = x.handler#metadata in
   Fmt.pf f "%s@%lu" M.interface x.id

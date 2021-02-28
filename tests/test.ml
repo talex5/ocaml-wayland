@@ -41,7 +41,9 @@ module S = struct
 
   let make_region r =
     let rects = ref [] in
-    Proxy.Handler.attach r @@ Wl_region.v1 ~user_data:(Server (Region rects)) @@ object
+    Proxy.Handler.attach r @@ object
+      inherit [_] Wl_region.handlers
+      method! user_data = Server (Region rects)
       method on_add _ ~x ~y ~width ~height =
         rects := { x; y; width; height } :: !rects
       method on_destroy t = Proxy.delete t
@@ -52,7 +54,8 @@ module S = struct
     let sid = t.next_surface in
     t.next_surface <- t.next_surface + 1;
     log t "Created surface %d" sid;
-    Proxy.Handler.attach m @@ Wl_surface.v1 @@ object (_ : 'a Wl_surface.h1)
+    Proxy.Handler.attach m @@ object
+      inherit [_] Wl_surface.handlers
       method on_attach _ ~buffer:_ ~x:_ ~y:_ = failwith "Not implemented"
       method on_commit _ = failwith "Not implemented"
       method on_damage _ ~x:_ ~y:_ ~width:_ ~height:_ = failwith "Not implemented"
@@ -65,10 +68,14 @@ module S = struct
           let Region r = user_data region in
           log t "Surface %d input region <- %a" sid (Fmt.(list ~sep:comma) pp_rect) !r
       method on_set_opaque_region _ ~region:_ = failwith "Not implemented"
+      method on_set_buffer_transform = failwith "Not implemented"
+      method on_set_buffer_scale = failwith "Not implemented"
+      method on_damage_buffer = failwith "Not implemented"
     end
 
   let make_compositor t proxy =
-    let _ : _ Proxy.t = Proxy.Service_handler.attach proxy @@ Wl_compositor.v1 @@ object
+    let _ : _ Proxy.t = Proxy.Service_handler.attach proxy @@ object
+        inherit [_] Wl_compositor.handlers ~version:1l
         method on_create_region _ region = make_region region
         method on_create_surface _ surface = make_surface t surface
       end
@@ -87,14 +94,16 @@ module S = struct
       i
     in
     let s : Server.t =
-      Server.connect socket @@ Wl_display.v1 @@ object
+      Server.connect socket @@ object
+        inherit [_] Wl_display.handlers ~version:1l
         method on_sync _ cb =
-          Proxy.Handler.attach cb @@ Wl_callback.v1 ();
+          Proxy.Handler.attach cb @@ new Wl_callback.handlers;
           Wl_callback.done_ cb ~callback_data:(next_serial ());
           Proxy.delete cb
 
         method on_get_registry _ reg =
-          Proxy.Handler.attach reg @@ Wl_registry.v1 @@ object
+          Proxy.Handler.attach reg @@ object
+            inherit [_] Wl_registry.handlers
             method on_bind : type a. _ -> name:int32 -> (a, [`Unknown], _) Proxy.t -> unit =
               fun _ ~name proxy ->
               match Proxy.ty proxy with
@@ -127,13 +136,14 @@ let test_simple _ () =
   let server = Unix_transport.of_socket socket_s |> S.connect in
   let open Wayland.Wayland_client in
   let* reg = Registry.of_display c in
-  let comp = Registry.bind reg @@ Wl_compositor.v1 () in
-  let surface = Wl_compositor.create_surface comp @@ Wl_surface.v1 @@ object
+  let comp = Registry.bind reg @@ new Wl_compositor.handlers ~version:1l in
+  let surface = Wl_compositor.create_surface comp @@ object
+      inherit [_] Wl_surface.handlers
       method on_enter _ ~output:_ = ()
       method on_leave _ ~output:_ = ()
     end
   in
-  let region = Wl_compositor.create_region comp @@ Wl_region.v1 () in
+  let region = Wl_compositor.create_region comp @@ new Wl_region.handlers in
   Wl_region.add region ~x:10l ~y:20l ~width:30l ~height:40l;
   Wl_surface.set_input_region surface ~region:(Some region);
   let* () = Display.sync c in

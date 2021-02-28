@@ -16,7 +16,7 @@ let rec process_recv_buffer t recv_buffer =
         let msg = Msg.cast msg in
         t.trace.inbound proxy msg;
         if proxy.can_recv then
-          proxy.handler.dispatch proxy msg
+          proxy.handler#dispatch proxy msg
         else
           Fmt.failwith "Received message for %a, which was shut down!" pp_proxy proxy
     end;
@@ -74,7 +74,7 @@ let connect ~trace role transport handler =
     set_closed;
     trace = Proxy.trace trace;
   } in
-  let display_proxy = Proxy.add_root t handler in
+  let display_proxy = Proxy.add_root t (handler :> _ Proxy.Service_handler.t) in
   Lwt.async (fun () -> listen t);
   (t, display_proxy)
 
