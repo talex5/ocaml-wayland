@@ -35,15 +35,21 @@ let of_socket socket = object (_ : S.transport)
       )
 end
 
+let socket_path ?wayland_display () =
+  let wayland_display =
+    match wayland_display with
+    | Some x -> x
+    | None -> 
+      Sys.getenv_opt "WAYLAND_DISPLAY"
+      |> Option.value ~default:"wayland-0"
+  in
+  make_display_absolute wayland_display
+
 let connect () =
   match Sys.getenv_opt "WAYLAND_SOCKET" with
   | Some _ -> failwith "TODO: WAYLAND_SOCKET"   (* TODO *)
   | None ->
-    let display =
-      Sys.getenv_opt "WAYLAND_DISPLAY"
-      |> Option.value ~default:"wayland-0"
-      |> make_display_absolute
-    in
+    let display = socket_path () in
     let socket =
       Unix.(socket PF_UNIX SOCK_STREAM 0 ~cloexec:true)
       |> Lwt_unix.of_unix_file_descr
