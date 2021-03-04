@@ -22,6 +22,7 @@ module type S = sig
   type _ ty += T : t ty
 
   val interface : string
+  val version : int32
   val requests : info
   val events : info
 end

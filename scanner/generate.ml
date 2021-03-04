@@ -523,6 +523,7 @@ let output ~opens ~internal (protocol : Protocol.t) =
           line "type t = %a" pp_poly iface.name;
           line "type _ Metadata.ty += T : %a Metadata.ty" pp_poly iface.name;
           line "let interface = %S" iface.name;
+          line "let version = %ul" iface.version;
           Fmt.(list ~sep:cut) pp_enum f iface.enums;
           line "";
           line "@[<v2>let requests = %a@]@," (op_info "request") iface.requests;
