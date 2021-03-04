@@ -22,3 +22,10 @@
  (targets xdg_decoration_unstable_v1_client.ml xdg_decoration_unstable_v1_server.ml xdg_decoration_unstable_v1_proto.ml)
  (deps   xdg-decoration-unstable-v1.xml)
  (action (run %{bin:wayland-scanner-ocaml} --open Wayland.Wayland_proto,Xdg_shell_proto %{deps})))
+
+(rule
+ (targets server_decoration_client.ml
+          server_decoration_server.ml
+          server_decoration_proto.ml)
+ (deps   server-decoration.xml)
+ (action (run %{bin:wayland-scanner-ocaml} --open Wayland.Wayland_proto %{deps})))
