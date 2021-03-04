@@ -59,7 +59,7 @@ let () =
   Lwt_main.run begin
     (* Connect to the server. *)
     let* transport = Wayland.Unix_transport.connect () in
-    let display, conn_closed = Wayland.Display.connect transport in
+    let display, conn_closed = Wayland.Client.connect transport in
     Lwt.on_success conn_closed (function
         | Ok () -> ()
         | Error ex -> raise ex

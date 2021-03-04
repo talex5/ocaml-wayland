@@ -126,7 +126,7 @@ end
 
 let test_simple _ () =
   let socket_c, socket_s = Lwt_unix.(socketpair PF_UNIX SOCK_STREAM 0) in
-  let c, conn_closed = Unix_transport.of_socket socket_c |> Display.connect in
+  let c, conn_closed = Unix_transport.of_socket socket_c |> Client.connect in
   Lwt.on_success conn_closed (function
       | Ok () -> ()
       | Error ex -> raise ex
@@ -144,7 +144,7 @@ let test_simple _ () =
   let region = Wl_compositor.create_region comp @@ new Wl_region.handlers in
   Wl_region.add region ~x:10l ~y:20l ~width:30l ~height:40l;
   Wl_surface.set_input_region surface ~region:(Some region);
-  let* () = Display.sync c in
+  let* () = Client.sync c in
   Alcotest.(check (list string)) "Check log" [
     "Created surface 1";
     "Surface 1 input region <- (10, 20)+(30, 40)";

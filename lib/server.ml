@@ -1,5 +1,14 @@
 open Wayland_server
 
+let log_msg_src = Logs.Src.create "wayland-server" ~doc:"Wayland server messages"
+module Log_msg = (val Logs.src_log log_msg_src : Logs.LOG)
+
+let init_logging = lazy (
+  match Sys.getenv_opt "WAYLAND_DEBUG" with
+  | Some ("1" | "server") -> Logs.Src.set_level log_msg_src (Some Logs.Debug)
+  | _ -> ()
+)
+
 type t = {
   conn : [`Server] Connection.t;
   wl_display : [`V1] Wl_display.t;
@@ -11,7 +20,7 @@ module Trace : TRACE = struct
   type role = [`Server]
 
   let inbound (type a) (proxy : (a, _, _) Proxy.t) msg =
-    Log.info (fun f ->
+    Log.debug (fun f ->
         let (module M : Metadata.S with type t = a) = Proxy.metadata proxy in
         let msg_name, arg_info = M.requests (Msg.op msg) in
         f "@[<h><- %a.%s %a@]"
@@ -21,7 +30,7 @@ module Trace : TRACE = struct
       )
 
   let outbound (type a) (proxy : (a, _, _) Proxy.t) msg =
-    Log.info (fun f ->
+    Log.debug (fun f ->
         let (module M) = Proxy.metadata proxy in
         let msg_name, arg_info = M.events (Msg.op msg) in
         f "@[<h>-> %a.%s %a@]"
@@ -33,6 +42,7 @@ end
 
 
 let connect ?(trace=(module Trace : TRACE)) transport handler =
+  Lazy.force init_logging;
   let conn, wl_display = Connection.connect ~trace `Server transport handler in
   { conn; wl_display }
 

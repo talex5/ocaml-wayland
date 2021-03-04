@@ -10,7 +10,10 @@ val connect : ?trace:(module TRACE) ->
     (typically created with {!Unix_transport.connect}).
     It spawns a background thread to handle incoming messages.
     It returns the new connection and a promise that resolves when
-    the connection ends. *)
+    the connection ends.
+    @param trace Used to trace all messages sent and received.
+                 The default tracer logs messages at debug level, and the log's source is set to debug level
+                 if $WAYLAND_DISPLAY is "1" or "client" the first time {!connect} is called. *)
 
 val sync : t -> unit Lwt.t
 (** Send a sync message to the server and wait for the reply.

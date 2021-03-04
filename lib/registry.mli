@@ -7,7 +7,7 @@ type entry = {
 
 type t
 
-val of_display : Display.t -> t Lwt.t
+val of_display : Client.t -> t Lwt.t
 (** [of_display d] creates a new registry from a display.
     It performs a sync before returning the result, so that the registry is fully-populated. *)
 

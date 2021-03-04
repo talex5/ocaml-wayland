@@ -22,13 +22,13 @@ let remove db ~name =
 
 let of_display d =
   let db = Hashtbl.create 20 in
-  let registry = Wl_display.get_registry (Display.wl_display d) @@ object
+  let registry = Wl_display.get_registry (Client.wl_display d) @@ object
       inherit [_] Wl_registry.handlers
       method on_global _ = add db
       method on_global_remove _ = remove db
     end
   in
-  let* () = Display.sync d in
+  let* () = Client.sync d in
   Lwt.return { db; registry }
 
 let get t = Hashtbl.find_all t.db

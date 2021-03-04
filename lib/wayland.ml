@@ -1,7 +1,7 @@
 module Unix_transport = Unix_transport
 (** Send messages over a Unix-domain socket. *)
 
-module Display = Display
+module Client = Client
 (** Connect to a Wayland server and interact with the initial display object. *)
 
 module Registry = Registry
