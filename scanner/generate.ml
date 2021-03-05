@@ -25,7 +25,7 @@ let pp_role f = function
 let pp_poly f name =
   Fmt.pf f "[`%s]" (String.capitalize_ascii (mangle name))
 
-let pp_enum_module (protocol : Protocol.t) (iface : Interface.t) f (arg:Arg.t) =
+let pp_enum_module (iface : Interface.t) f (arg:Arg.t) =
   let enum =
     Option.get arg.enum
     |> String.split_on_char '.'
@@ -36,8 +36,7 @@ let pp_enum_module (protocol : Protocol.t) (iface : Interface.t) f (arg:Arg.t) =
     | [leaf] -> [module_name iface.name; leaf]
     | x -> x
   in
-  Fmt.pf f "%s_proto.%a"
-    (module_name protocol.name)
+  Fmt.pf f "Imports.%a"
     Fmt.(list ~sep:(unit ".") string) enum
 
 let pp_tvars f = function
@@ -49,9 +48,9 @@ let pp_tvars f = function
     done;
     Fmt.string f ". "
 
-let pp_type ~role ~next_tvar proto iface f (arg:Arg.t) =
+let pp_type ~role ~next_tvar iface f (arg:Arg.t) =
   begin match arg.ty with
-    | `Uint | `Int when arg.enum <> None -> Fmt.pf f "%a.t" (pp_enum_module proto iface) arg
+    | `Uint | `Int when arg.enum <> None -> Fmt.pf f "%a.t" (pp_enum_module iface) arg
     | `Uint | `Int -> Fmt.string f "int32"
     | `String -> Fmt.string f "string"
     | `Array -> Fmt.string f "string"
@@ -85,15 +84,15 @@ let named_argument (arg : Arg.t) =
   | `Object _ -> arg.name <> "id"
   | _ -> true
 
-let pp_arg ~role ~next_tvar proto iface f arg =
+let pp_arg ~role ~next_tvar iface f arg =
   if named_argument arg then
-    Fmt.pf f "%s:%a" (mangle arg.name) (pp_type ~role ~next_tvar proto iface) arg
+    Fmt.pf f "%s:%a" (mangle arg.name) (pp_type ~role ~next_tvar iface) arg
   else
-    pp_type ~role ~next_tvar proto iface f arg
+    pp_type ~role ~next_tvar iface f arg
 
-let pp_sig ~role ~next_tvar proto iface f = function
+let pp_sig ~role ~next_tvar iface f = function
   | [] -> Fmt.string f "unit"
-  | args -> Fmt.(list ~sep:(unit " ->@ ") (pp_arg ~role ~next_tvar proto iface) ++ any " ->@ unit") f args
+  | args -> Fmt.(list ~sep:(unit " ->@ ") (pp_arg ~role ~next_tvar iface) ++ any " ->@ unit") f args
 
 let pp_args ~role ~with_types =
   let pp_arg f arg =
@@ -392,7 +391,7 @@ let make_wrappers ~opens ~internal role (protocol : Protocol.t) f =
                       m
                   | `Int | `Uint when arg.enum <> None ->
                     line "Msg.add_int _msg (%a.to_int32 %s);"
-                      (pp_enum_module protocol iface) arg m
+                      (pp_enum_module iface) arg m
                   | _ ->
                     line "Msg.add_%a%s _msg %s;"
                       pp_type_getter arg.ty
@@ -434,7 +433,7 @@ let make_wrappers ~opens ~internal role (protocol : Protocol.t) f =
       line "";
       msgs_in |> List.iter (fun (msg : Message.t) ->
           let next_tvar = ref 0 in
-          let args = Fmt.strf "@[%a@]" (pp_sig ~role ~next_tvar protocol iface) msg.args in
+          let args = Fmt.strf "@[%a@]" (pp_sig ~role ~next_tvar iface) msg.args in
           line "method private virtual on_%s : @[%a@]%s %s"
             msg.name pp_tvars !next_tvar
             (if msg.ty = `Normal || role = `Server then "'v t ->" else "")
@@ -452,7 +451,7 @@ let make_wrappers ~opens ~internal role (protocol : Protocol.t) f =
               let m = mangle arg.name in
               begin match arg.ty with
                 | `Int | `Uint when arg.enum <> None ->
-                  line "@[<v2>let %s = Msg.get_int _msg |> %a.of_int32 in@]" m (pp_enum_module protocol iface) arg
+                  line "@[<v2>let %s = Msg.get_int _msg |> %a.of_int32 in@]" m (pp_enum_module iface) arg
                 | `New_ID None ->
                   line "let (module M%d : Metadata.S) = Msg.get_string _msg |> Iface_reg.lookup in" i;
                   line "@[<v2>let %s =" m;

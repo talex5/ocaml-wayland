@@ -29,3 +29,10 @@
           server_decoration_proto.ml)
  (deps   server-decoration.xml)
  (action (run %{bin:wayland-scanner-ocaml} --open Wayland.Wayland_proto %{deps})))
+
+(rule
+ (targets wlr_screencopy_unstable_v1_client.ml
+          wlr_screencopy_unstable_v1_server.ml
+          wlr_screencopy_unstable_v1_proto.ml)
+ (deps   wlr-screencopy-unstable-v1.xml)
+ (action (run %{bin:wayland-scanner-ocaml} --open Wayland.Wayland_proto %{deps})))
