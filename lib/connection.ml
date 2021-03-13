@@ -36,7 +36,7 @@ let listen t =
         Lwt.return_unit
       ) else (
         Recv_buffer.update_producer recv_buffer got;
-        Log.debug (fun f -> f "Ring after adding %d bytes: %a@." got Recv_buffer.dump recv_buffer);
+        Log.debug (fun f -> f "Ring after adding %d bytes: %a" got Recv_buffer.dump recv_buffer);
         process_recv_buffer t recv_buffer;
         aux ()
       )
