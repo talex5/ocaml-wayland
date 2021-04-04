@@ -1,7 +1,5 @@
 # Pure OCaml Wayland protocol library
 
-Status: **prototyping**
-
 * [API documentation][]
 
 Wayland is a communications protocol intended for use between processes on a single computer.
@@ -105,22 +103,22 @@ This says that `create_surface` can be used with any version `'v` of the composi
 but you must supply handlers for version `'v` of the surface object.
 The return value will be a surface proxy with the same version as the compositor.
 
-When binding a top-level service, there is one handler constructor function for each distinct version.
-For example, to create a handler for version 3 (or later) of the compositor interface
-you would have your handlers inherit from `Wl_compositor.v3`
+There is one handler class for each distinct version.
+For example, to create a handler for version 4 (or later) of the compositor interface
+you would have your handlers inherit from `Wl_compositor.v4`
 (or just use it directly, since in this case there are no events to be handled). e.g.
 
 ```ocaml
-let compositor = Registry.bind reg @@ new Wl_compositor.v3 in
-(* [compositor] has type [([ `Wl_compositor ], [ `V3 | `V4 ], [ `Client ]) Proxy.t]. *)
+let compositor = Registry.bind reg @@ new Wl_compositor.v4 in
+(* [compositor] has type [[`V4] Wl_compositor.t]. *)
 ```
 
-This means that you can send any compositor request that was available in version 3
+This means that you can send any compositor request that was available in version 4
 (but the `bind` will fail if the server doesn't support this version).
-When you create new objects using the compositor, it will know that they also will be version 3 or later.
+When you create new objects using the compositor, it will know that they also will be version 4.
 
 To avoid an explosion of version combinations,
-the generated handler types require you to handle incoming messages of all versions in your copy of the schema.
+the generated handler types require you to handle incoming messages of all later versions in your copy of the schema.
 For example, you can't ask for exactly version 3 of the compositor
 and then not bother implementing handlers for v4 events.
 

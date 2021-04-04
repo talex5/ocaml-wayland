@@ -43,7 +43,7 @@ end
 let connect ?(trace=(module Trace : TRACE)) transport =
   Lazy.force init_logging;
   let conn, wl_display = Connection.connect ~trace `Client transport @@ object
-      inherit Wl_display.v1
+      inherit [_] Wl_display.v1
 
       method on_error _ ~object_id ~code ~message =
         Log.err (fun f -> f "Received Wayland error: %ld %S on object %ld" code message object_id)
@@ -57,7 +57,7 @@ let connect ?(trace=(module Trace : TRACE)) transport =
 let sync t =
   let result, set_result = Lwt.wait () in
   let _ : _ Wl_callback.t = Wl_display.sync t.wl_display @@ object
-      inherit [_] Wl_callback.handlers
+      inherit [_] Wl_callback.v1
       method on_done ~callback_data:_ = Lwt.wakeup set_result ()
     end
   in

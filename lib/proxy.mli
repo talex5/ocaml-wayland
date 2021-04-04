@@ -101,12 +101,12 @@ module Service_handler : sig
       since otherwise processing a message addressed to the new object will fail.
       This is called from the generated code; the user code then calls the result. *)
 
-  val attach_proxy : ('a, [`Unknown], 'role) proxy -> ('a, 'v, 'role) #t -> ('a, 'v, 'role) proxy
+  val attach_proxy : ('a, [`Unknown], 'role) proxy -> ('a, ([> `V1] as 'v), 'role) #t -> ('a, 'v, 'role) proxy
   (** [attach_proxy p t] sets [t] as the handler for [p],
       which must be a partly initialised proxy returned by [accept_new].
       It returns the proxy with its version cast to the handler's version. *)
 
-  val attach : ('a, [`Unknown], 'role) proxy -> ('a, 'v, 'role) #t -> unit
+  val attach : ('a, [`Unknown], 'role) proxy -> ('a, [> `V1], 'role) #t -> unit
   (** Like [attach_proxy], but ignores the resulting proxy.
       Useful if the object only needs to respond to messages from the peer. *)
 end

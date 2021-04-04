@@ -12,7 +12,7 @@ module Registry = Registry
     Wl_callback seems to be an exception to the usual Wayland versioning rules
     (a wl_callback can be created by multiple objects). *)
 let callback fn = object
-  inherit [_] Wayland_client.Wl_callback.handlers
+  inherit [_] Wayland_client.Wl_callback.v1
   method on_done ~callback_data = fn callback_data
 end
 

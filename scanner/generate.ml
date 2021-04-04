@@ -214,13 +214,6 @@ let rec root_interface ~parents (interface : Interface.t) =
     );
     root_interface ~parents parent
 
-(* Which side sends the message asking to create [interface]? *)
-let get_created_by ~parents interface =
-  match Parent.parent parents interface with
-  | None
-  | Some (_, `Request) -> `Client
-  | Some (_, `Event) -> `Server
-
 type version_group = {
   versions : int list;  (* List of identical versions *)
   requests : (int * Message.t) list;
@@ -301,17 +294,6 @@ let pp_enum_link (protocol : Protocol.t) (iface : Interface.t) f (enum : Enum.t)
     (module_name iface.name)
     (module_name enum.name)
 
-let pp_handler_version ~is_service ~we_create f n_versions =
-  if is_service && not we_create then (
-    (* The client can specify any version, so we have to handle them all, and
-       the type of the proxy is taken directly from the type of the handler. *)
-    Fmt.pf f "[> %a]" pp_versions (1, n_versions)
-  ) else (
-    (* For services that we create the version gets constrained later in the [vN] function.
-       For non-service objects, the version is determined by the parent object's version. *)
-    Fmt.pf f "'v"
-  )
-
 let make_wrappers ~opens ~internal role (protocol : Protocol.t) f =
   let parents = Parent.index protocol in
   let line fmt = Fmt.pf f ("@," ^^ fmt) in
@@ -336,7 +318,6 @@ let make_wrappers ~opens ~internal role (protocol : Protocol.t) f =
   line "";
   protocol.interfaces |> List.iter (fun (iface : Interface.t) ->
       let root = root_interface ~parents iface in
-      let created_by = get_created_by ~parents iface in
       let n_versions = root.version in
       let is_service = root == iface in
       let versions = get_versions ~n_versions iface in
@@ -411,39 +392,39 @@ let make_wrappers ~opens ~internal role (protocol : Protocol.t) f =
             );
           line "";
         );
-      (* Handlers *)
+      (* Handlers.
+         We define a hidden "unsafe" handler class that ignores versions, and then make the public
+         handlers inherit from that, specialising the types to the ones we want.
+         For example:
+         - [Wl_data_offer.v1.on_accept] needs to accept a v1-or-later proxy.
+         - [Wl_data_offer.v2.on_accept] needs to accept a v2-or-later proxy.
+         - [Wl_data_offer.v1.on_set_actions] only needs to handle v3 proxies,
+           because [set_actions] is a v3-only operation. *)
       let msgs_in, _msgs_out =
         match role with
         | `Client -> iface.events, iface.requests
         | `Server -> iface.requests, iface.events
       in
-      let handler_class =
-        if is_service && created_by = role then "_handlers_unsafe" else "handlers"
-      in
       let opt_virtual = if msgs_in <> [] then "virtual " else "" in
-      line "@[<v2>class %s['v] %s " opt_virtual handler_class;
-      Fmt.pf f "=@ object (_self : (%a, 'v, %a) #Proxy.Handler.t)"
-        pp_poly iface.name pp_role role;
+      line "(**/**)";
+      line "@[<v2>class %s['v] _handlers_unsafe = object (_self : (_, 'v, _) #Proxy.Handler.t)"
+        opt_virtual;
       line "method user_data = S.No_data";
       line "method metadata = (module %s)" (full_module_name protocol iface);
-      if is_service && created_by <> role then (
-        line "method min_version = 1l";
-        line "method max_version = %dl" n_versions;
-      );
+      line "method max_version = %dl" n_versions;
       line "";
       msgs_in |> List.iter (fun (msg : Message.t) ->
           let next_tvar = ref 0 in
           let args = Fmt.strf "@[%a@]" (pp_sig ~role ~next_tvar iface) msg.args in
           line "method private virtual on_%s : @[%a@]%s %s"
             msg.name pp_tvars !next_tvar
-            (if msg.ty = `Normal || role = `Server then "'v t ->" else "")
+            (if msg.ty = `Normal || role = `Server then "[> ] t ->" else "")
             args;
-          comment f msg.description;
           Fmt.cut f ()
         );
       line "";
-      line "@[<v2>method dispatch (_proxy : (_, %a, _) Proxy.t) _msg ="
-        (pp_handler_version ~is_service ~we_create:(created_by = role)) n_versions;
+      line "@[<v2>method dispatch (_proxy : 'v t) _msg =";
+      line "let _proxy = Proxy.cast_version _proxy in";
       line "match Msg.op _msg with";
       msgs_in |> List.iteri (fun i (msg : Message.t) ->
           line "@[<v2>| %d ->" i;
@@ -493,18 +474,38 @@ let make_wrappers ~opens ~internal role (protocol : Protocol.t) f =
         );
       line "| _ -> assert false@]";
       Fmt.pf f "@]@,end";
-      if is_service && created_by = role then (
+      line "(**/**)";
+      line "";
+      line "(** {2 Handlers}";
+      line "    Note: Servers will always want to use [v1].";
+      line " *)";
+      line "";
+      let pp_proxy_range f ((msg : Message.t), v) =
+        if msg.ty = `Normal || role = `Server then
+          Fmt.pf f "[> %a] t ->" pp_versions (max v msg.since, n_versions)
+      in
+      for v = 1 to n_versions do
         line "";
-        line "(** {2 Requesting a minimum version} *)";
-        line "";
-        for v = 1 to n_versions do
-          line "@[<v2>class %sv%d = object (_ : (_, _, _) #Proxy.Service_handler.t)" opt_virtual v;
-          line "inherit [[%a]] _handlers_unsafe" pp_versions (v, n_versions);
-          line "method min_version = %dl" v;
-          line "method max_version = %dl" n_versions;
-          Fmt.pf f "@]@,end";
-        done
-      );
+        line "(** Handler for a proxy with version >= %d. *)" v;
+        line "@[<v2>class %s['v] v%d = object (_ : (_, 'v, _) #Proxy.Service_handler.t)" opt_virtual v;
+        line "(**/**)";
+        line "inherit [[< %a] as 'v] _handlers_unsafe" pp_versions (v, n_versions);
+        line "(**/**)";
+        msgs_in |> List.iter (fun (msg : Message.t) ->
+            let next_tvar = ref 0 in
+            let args = Fmt.strf "@[%a@]" (pp_sig ~role ~next_tvar iface) msg.args in
+            line "method private virtual on_%s : @[%a@]%a %s"
+              msg.name pp_tvars !next_tvar
+              pp_proxy_range (msg, v)
+              args;
+            comment f msg.description;
+            Fmt.cut f ()
+          );
+        line "method min_version = %dl" v;
+        if is_service then
+          line "method bind_version : [`V%d] = `V%d" v v;
+        Fmt.pf f "@]@,end";
+      done;
       Fmt.pf f "@]@,end"; (* Interface *)
     )
 
