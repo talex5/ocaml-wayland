@@ -43,3 +43,10 @@
           drm_proto.ml)
  (deps   wayland-drm.xml)
  (action (run %{bin:wayland-scanner-ocaml} --open Wayland.Wayland_proto %{deps})))
+
+(rule
+ (targets linux_dmabuf_unstable_v1_client.ml
+          linux_dmabuf_unstable_v1_server.ml
+          linux_dmabuf_unstable_v1_proto.ml)
+ (deps   linux-dmabuf-unstable-v1.xml)
+ (action (run %{bin:wayland-scanner-ocaml} --open Wayland.Wayland_proto %{deps})))

@@ -206,7 +206,7 @@ let pp_arrays f args =
 let rec root_interface ~parents (interface : Interface.t) =
   match Parent.parent parents interface with
   | None -> interface
-  | Some (parent, _) ->
+  | Some parent ->
     if parent.version < interface.version then (
       Fmt.failwith "Interface %S has version %d, which is less that its child %S at %d!"
         parent.name parent.version
