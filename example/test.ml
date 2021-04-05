@@ -22,7 +22,7 @@ let draw_frame t =
   let stride = t.width * 4 in
   let size = t.height * stride in
   let pool, data = Shm.with_memory_fd ~size (fun fd ->
-      let pool = Wl_shm.create_pool t.shm (new Wl_shm_pool.handlers) ~fd ~size:(Int32.of_int size) in
+      let pool = Wl_shm.create_pool t.shm (new Wl_shm_pool.v1) ~fd ~size:(Int32.of_int size) in
       let ba = Unix.map_file fd Bigarray.Int32 Bigarray.c_layout true [| t.height; t.width |] in
       pool, Bigarray.array2_of_genarray ba
     ) in
@@ -34,7 +34,7 @@ let draw_frame t =
       ~stride:(Int32.of_int stride)
       ~format:Wl_shm.Format.Xrgb8888
     @@ object
-      inherit [_] Wl_buffer.handlers
+      inherit [_] Wl_buffer.v1
       method on_release = Wl_buffer.destroy
     end
   in
@@ -68,23 +68,23 @@ let () =
     let* reg = Registry.of_display display in
     let compositor = Registry.bind reg (new Wl_compositor.v4) in
     let shm = Registry.bind reg @@ object
-        inherit Wl_shm.v1
+        inherit [_] Wl_shm.v1
         method on_format _ ~format:_ = ()
       end
     in
     let xdg_wm_base = Registry.bind reg @@ object
-        inherit Xdg_wm_base.v1
+        inherit [_] Xdg_wm_base.v1
         method on_ping = Xdg_wm_base.pong
       end
     in
     let surface = Wl_compositor.create_surface compositor @@ object
-        inherit [_] Wl_surface.handlers
+        inherit [_] Wl_surface.v1
         method on_enter _ ~output:_ = ()
         method on_leave _ ~output:_ = ()
       end
     in
     let seat = Registry.bind reg @@ object
-        inherit Wl_seat.v1
+        inherit [_] Wl_seat.v1
         method on_capabilities _ ~capabilities:_ = ()
         method on_name _ ~name:_ = ()
       end
@@ -92,7 +92,7 @@ let () =
     let t = { shm; surface; scroll = 0; vy = 1; width = 0; height = 0; fg = 0xFFEEEEEEl } in
     let closed, set_closed = Lwt.wait () in
     let _keyboard = Wl_seat.get_keyboard seat @@ object
-        inherit [_] Wl_keyboard.handlers
+        inherit [_] Wl_keyboard.v1
         method on_keymap    _ ~format:_ ~fd ~size:_ = Unix.close fd
         method on_enter     _ ~serial:_ ~surface:_ ~keys:_ = ()
         method on_leave     _ ~serial:_ ~surface:_ = ()
@@ -105,7 +105,7 @@ let () =
       end
     in
     let _pointer = Wl_seat.get_pointer seat @@ object
-        inherit [_] Wl_pointer.handlers
+        inherit [_] Wl_pointer.v1
         method on_axis _ ~time:_ ~axis:_ ~value:_ = ()
         method on_button _ ~serial:_ ~time:_ ~button:_ ~state =
           match state with
@@ -122,7 +122,7 @@ let () =
     in
     let configured, set_configured = Lwt.wait () in
     let xdg_surface = Xdg_wm_base.get_xdg_surface xdg_wm_base ~surface @@ object
-        inherit [_] Xdg_surface.handlers
+        inherit [_] Xdg_surface.v1
         method on_configure proxy ~serial =
           Xdg_surface.ack_configure proxy ~serial;
           if Lwt.is_sleeping configured then
@@ -130,7 +130,7 @@ let () =
       end
     in
     let toplevel = Xdg_surface.get_toplevel xdg_surface @@ object
-        inherit [_] Xdg_toplevel.handlers
+        inherit [_] Xdg_toplevel.v1
         method on_configure _ ~width ~height ~states:_ =
           t.width <- if width = 0l then 640 else Int32.to_int width;
           t.height <- if height = 0l then 480 else Int32.to_int height
