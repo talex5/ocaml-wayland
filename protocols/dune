@@ -36,3 +36,10 @@
           wlr_screencopy_unstable_v1_proto.ml)
  (deps   wlr-screencopy-unstable-v1.xml)
  (action (run %{bin:wayland-scanner-ocaml} --open Wayland.Wayland_proto %{deps})))
+
+(rule
+ (targets drm_client.ml
+          drm_server.ml
+          drm_proto.ml)
+ (deps   wayland-drm.xml)
+ (action (run %{bin:wayland-scanner-ocaml} --open Wayland.Wayland_proto %{deps})))
