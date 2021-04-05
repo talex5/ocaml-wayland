@@ -55,11 +55,11 @@ let pp_type ~role ~next_tvar iface f (arg:Arg.t) =
     | `String -> Fmt.string f "string"
     | `Array -> Fmt.string f "string"
     | `Object None -> Fmt.string f "int32"
+    | `Object (Some i) -> Fmt.pf f "(%a, [> Imports.%s.versions], %a) Proxy.t" pp_poly i (module_name i) pp_role role
     | `New_ID None ->
       let t = !next_tvar in
       next_tvar := t + 1;
       Fmt.pf f "('x%d, [`Unknown], %a) Proxy.t" t pp_role role
-    | `Object (Some i)
     | `New_ID (Some i) -> Fmt.pf f "(%a, 'v, %a) Proxy.t" pp_poly i pp_role role
     | `Fixed -> Fmt.string f "Fixed.t"
     | `FD -> Fmt.string f "Unix.file_descr"
@@ -294,6 +294,16 @@ let pp_enum_link (protocol : Protocol.t) (iface : Interface.t) f (enum : Enum.t)
     (module_name iface.name)
     (module_name enum.name)
 
+let pp_msg_handler_sig ~role ~iface ~pp_self f (msg : Message.t) =
+  let next_tvar = ref 0 in
+  let _args = Fmt.strf "@[%a@]" (pp_sig ~role ~next_tvar iface) msg.args in
+  let n_tvars = !next_tvar in
+  next_tvar := 0;
+  Fmt.pf f "@[@[%a@]%t %a@]@,"
+    pp_tvars n_tvars
+    (fun f -> if msg.ty = `Normal || role = `Server then (pp_self f; Fmt.string f " ->"))
+    (pp_sig ~role ~next_tvar iface) msg.args
+
 let make_wrappers ~opens ~internal role (protocol : Protocol.t) f =
   let parents = Parent.index protocol in
   let line fmt = Fmt.pf f ("@," ^^ fmt) in
@@ -414,13 +424,8 @@ let make_wrappers ~opens ~internal role (protocol : Protocol.t) f =
       line "method max_version = %dl" n_versions;
       line "";
       msgs_in |> List.iter (fun (msg : Message.t) ->
-          let next_tvar = ref 0 in
-          let args = Fmt.strf "@[%a@]" (pp_sig ~role ~next_tvar iface) msg.args in
-          line "method private virtual on_%s : @[%a@]%s %s"
-            msg.name pp_tvars !next_tvar
-            (if msg.ty = `Normal || role = `Server then "[> ] t ->" else "")
-            args;
-          Fmt.cut f ()
+          let pp_self f = Fmt.string f "[> ] t" in
+          line "method private virtual on_%s : %a" msg.name (pp_msg_handler_sig ~role ~iface ~pp_self) msg;
         );
       line "";
       line "@[<v2>method dispatch (_proxy : 'v t) _msg =";
@@ -480,10 +485,6 @@ let make_wrappers ~opens ~internal role (protocol : Protocol.t) f =
       line "    Note: Servers will always want to use [v1].";
       line " *)";
       line "";
-      let pp_proxy_range f ((msg : Message.t), v) =
-        if msg.ty = `Normal || role = `Server then
-          Fmt.pf f "[> %a] t ->" pp_versions (max v msg.since, n_versions)
-      in
       for v = 1 to n_versions do
         line "";
         line "(** Handler for a proxy with version >= %d. *)" v;
@@ -492,12 +493,10 @@ let make_wrappers ~opens ~internal role (protocol : Protocol.t) f =
         line "inherit [[< %a] as 'v] _handlers_unsafe" pp_versions (v, n_versions);
         line "(**/**)";
         msgs_in |> List.iter (fun (msg : Message.t) ->
-            let next_tvar = ref 0 in
-            let args = Fmt.strf "@[%a@]" (pp_sig ~role ~next_tvar iface) msg.args in
-            line "method private virtual on_%s : @[%a@]%a %s"
-              msg.name pp_tvars !next_tvar
-              pp_proxy_range (msg, v)
-              args;
+            let pp_self f =
+              Fmt.pf f "[> %a] t" pp_versions (max v msg.since, n_versions)
+            in
+            line "method private virtual on_%s : %a" msg.name (pp_msg_handler_sig ~role ~iface ~pp_self) msg;
             comment f msg.description;
             Fmt.cut f ()
           );
@@ -522,6 +521,7 @@ let output ~opens ~internal (protocol : Protocol.t) =
           line "@[<v2>module %s = struct" (module_name iface.name);
           line "type t = %a" pp_poly iface.name;
           line "type _ Metadata.ty += T : %a Metadata.ty" pp_poly iface.name;
+          line "type versions = [%a]" pp_versions (1, iface.version);
           line "let interface = %S" iface.name;
           line "let version = %ul" iface.version;
           Fmt.(list ~sep:cut) pp_enum f iface.enums;
