@@ -307,17 +307,17 @@ let pp_msg_handler_sig ~role ~iface ~pp_self f (msg : Message.t) =
 let make_wrappers ~opens ~internal role (protocol : Protocol.t) f =
   let parents = Parent.index protocol in
   let line fmt = Fmt.pf f ("@," ^^ fmt) in
+  line {|[@@@@@@ocaml.warning "-27"]|};
   line "@[<v2>open struct";
   line "@[<v2>module Imports = struct";
   line "include %s_proto" (module_name protocol.name);
   List.iter (line "include %s") opens;
-  Fmt.pf f "@]@,end@]@,end@,";
+  Fmt.pf f "@]@,end";
   let _incoming, _outgoing =
     match role with
     | `Client -> "event", "request"
     | `Server -> "request", "event"
   in
-  line {|[@@@@@@ocaml.warning "-27"]|};
   if not internal then (
     line "@,module Proxy = Wayland.Proxy";
     line "module Msg = Wayland.Msg";
@@ -325,6 +325,7 @@ let make_wrappers ~opens ~internal role (protocol : Protocol.t) f =
     line "module Iface_reg = Wayland.Iface_reg";
     line "module S = Wayland.S";
   );
+  Fmt.pf f "@]@,end";
   line "";
   protocol.interfaces |> List.iter (fun (iface : Interface.t) ->
       let root = root_interface ~parents iface in
@@ -513,9 +514,11 @@ let output ~opens ~internal (protocol : Protocol.t) =
   with_output (file_base ^ "_proto.ml") (fun f ->
       let line fmt = Fmt.pf f ("@," ^^ fmt) in
       if not internal then (
+        line "@[<v2>open struct";
         line "module Proxy = Wayland.Proxy";
         line "module Iface_reg = Wayland.Iface_reg";
         line "module Metadata = Wayland.Metadata";
+        Fmt.pf f "@]@,end@,";
       );
       protocol.interfaces |> List.iter (fun (iface : Interface.t) ->
           line "@[<v2>module %s = struct" (module_name iface.name);
