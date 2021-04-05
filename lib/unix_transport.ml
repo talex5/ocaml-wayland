@@ -47,8 +47,7 @@ let socket_path ?wayland_display () =
 
 let connect () =
   match Sys.getenv_opt "WAYLAND_SOCKET" with
-  | Some _ -> failwith "TODO: WAYLAND_SOCKET"   (* TODO *)
-  | None ->
+  | None | Some "" ->
     let display = socket_path () in
     let socket =
       Unix.(socket PF_UNIX SOCK_STREAM 0 ~cloexec:true)
@@ -57,3 +56,14 @@ let connect () =
     Log.info (fun f -> f "Connecting to %S" display);
     let* () = Lwt_unix.connect socket (Unix.ADDR_UNIX display) in
     Lwt.return (of_socket socket)
+  | Some i ->
+    match int_of_string_opt i with
+    | None -> Fmt.failwith "Bad WAYLAND_SOCKET: %S is not an integer!" i
+    | Some i ->
+      (* The OCaml developers recommend using Obj.magic here: https://github.com/ocaml/ocaml/issues/6948 *)
+      assert (Sys.os_type = "Unix");
+      Log.info (fun f -> f "Connecting to file descriptor %d" i);
+      let socket : Unix.file_descr = Obj.magic i in
+      Unix.set_close_on_exec socket;
+      Unix.putenv "WAYLAND_SOCKET" "";
+      Lwt.return (of_socket (Lwt_unix.of_unix_file_descr socket))

@@ -227,10 +227,6 @@ by calling `Proxy.delete` immediately.
 However, when relaying to an upstream service it may be useful to delay this
 until the upstream service has confirmed the deletion too.
 
-## TODO
-
-- Using `$WAYLAND_SOCKET` to pass an FD doesn't work yet.
-
 [The Wayland Protocol]: https://wayland-book.com/
 [Cap'n Proto RPC]: https://github.com/mirage/capnp-rpc
 [API documentation]: https://talex5.github.io/ocaml-wayland/wayland/index.html
