@@ -6,6 +6,7 @@
 (authors "talex5@gmail.com")
 (maintainers "talex5@gmail.com")
 (documentation "https://talex5.github.io/ocaml-wayland/")
+(license "Apache-2.0 (excluding schema files)")
 (package
  (name wayland)
  (synopsis "Pure OCaml Wayland protocol library")
