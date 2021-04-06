@@ -1,5 +1,8 @@
 open Lwt.Syntax
 
+(* SIGPIPE makes no sense in a modern application. *)
+let () = Sys.(set_signal sigpipe Signal_ignore)
+
 let xdg_runtime_dir () =
   match Sys.getenv_opt "XDG_RUNTIME_DIR" with
   | Some x -> x

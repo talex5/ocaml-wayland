@@ -85,7 +85,7 @@ let enqueue t msg =
         (fun () -> transmit t)
         (fun ex ->
            if Lwt.is_sleeping t.closed then (
-             Lwt.wakeup_exn t.set_closed ex;
+             Lwt.wakeup t.set_closed (Error ex);
            ) else
              Log.debug (fun f -> f "Transmit failed (but connection already closed): %a" Fmt.exn ex);
            Queue.iter cancel_msg t.outbox
