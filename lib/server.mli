@@ -9,7 +9,7 @@ val connect : ?trace:(module TRACE) ->
     It spawns a background thread to handle incoming messages.
     @param trace Used to trace all messages sent and received.
                  The default tracer logs messages at debug level, and the log's source is set to debug level
-                 if $WAYLAND_DISPLAY is "1" or "server" the first time {!connect} is called. *)
+                 if $WAYLAND_DEBUG is "1" or "server" the first time {!connect} is called. *)
 
 val wl_display : t -> [`V1] Wayland_server.Wl_display.t
 
