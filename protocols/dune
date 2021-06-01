@@ -14,6 +14,11 @@
  (action (run %{bin:wayland-scanner-ocaml} --open Wayland.Wayland_proto %{deps})))
 
 (rule
+ (targets wp_primary_selection_unstable_v1_client.ml wp_primary_selection_unstable_v1_server.ml wp_primary_selection_unstable_v1_proto.ml)
+ (deps   primary-selection-unstable-v1.xml)
+ (action (run %{bin:wayland-scanner-ocaml} --open Wayland.Wayland_proto %{deps})))
+
+(rule
  (targets xdg_output_unstable_v1_client.ml xdg_output_unstable_v1_server.ml xdg_output_unstable_v1_proto.ml)
  (deps   xdg-output-unstable-v1.xml)
  (action (run %{bin:wayland-scanner-ocaml} --open Wayland.Wayland_proto %{deps})))
