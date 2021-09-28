@@ -108,7 +108,9 @@ module Service_handler = struct
     proxy
 end
 
-let id t = t.id
+let id t =
+  if t.can_send then t.id
+  else Fmt.invalid_arg "Attempt to use %a after destroying it" pp t
 
 let id_opt = function
   | None -> 0l

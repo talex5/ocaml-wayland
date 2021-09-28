@@ -112,7 +112,8 @@ module Service_handler : sig
 end
 
 val id : _ t -> int32
-(** [id t] is [t]'s object ID. Use this to refer to the object in a message. *)
+(** [id t] is [t]'s object ID. Use this to refer to the object in a message.
+    @raise Invalid_argument if the proxy has been destroyed (can no longer be used for sending). *)
 
 val id_opt : _ t option -> int32
 (** Like [id] but returns 0l for [None]. *)
