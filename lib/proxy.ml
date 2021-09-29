@@ -52,6 +52,8 @@ let version t = t.version
 
 let metadata t = t.handler#metadata
 
+let can_send t = t.can_send
+
 let ty (type a) t =
   let (module M : Metadata.S with type t = a) = metadata t in
   M.T
