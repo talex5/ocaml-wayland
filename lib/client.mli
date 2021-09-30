@@ -22,3 +22,7 @@ val sync : t -> unit Lwt.t
 val wl_display : t -> [`V1] Wayland_client.Wl_display.t
 (** [wl_display t] returns the initial object for the display.
     You probably want to use {!Registry.of_display} instead. *)
+
+val set_paused : t -> bool -> unit
+(** [set_paused t] sets the paused state.
+    No further incoming messages will be dispatched while [t] is paused. *)

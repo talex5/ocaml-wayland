@@ -5,8 +5,9 @@ type 'a t = 'a Internal.connection
 
 (* Dispatch all complete messages in [recv_buffer]. *)
 let rec process_recv_buffer t recv_buffer =
+  let* () = t.paused in
   match Msg.parse ~fds:t.incoming_fds (Recv_buffer.data recv_buffer) with
-  | None -> ()
+  | None -> Lwt.return_unit
   | Some msg ->
     begin
       let obj = Msg.obj msg in
@@ -37,7 +38,7 @@ let listen t =
       ) else (
         Recv_buffer.update_producer recv_buffer got;
         Log.debug (fun f -> f "Ring after adding %d bytes: %a" got Recv_buffer.dump recv_buffer);
-        process_recv_buffer t recv_buffer;
+        let* () = process_recv_buffer t recv_buffer in
         aux ()
       )
     ) else (
@@ -64,6 +65,8 @@ let connect ~trace role transport handler =
   let closed, set_closed = Lwt.wait () in
   let t = {
     transport = (transport :> S.transport);
+    paused = Lwt.return_unit;
+    unpause = ignore;
     role;
     objects = Objects.empty;
     free_ids = [];
@@ -79,3 +82,13 @@ let connect ~trace role transport handler =
   (t, display_proxy)
 
 let closed t = t.closed
+
+let set_paused t = function
+  | false ->
+    if Lwt.is_sleeping t.paused then t.unpause ()
+  | true ->
+    if not (Lwt.is_sleeping t.paused) then (
+      let paused, set_paused = Lwt.wait () in
+      t.paused <- paused;
+      t.unpause <- Lwt.wakeup set_paused
+    )
