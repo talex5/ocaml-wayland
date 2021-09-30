@@ -35,6 +35,10 @@ val on_delete : (_, _, _) t -> (unit -> unit) -> unit
 (** [on_delete t f] calls [f] when [t] is deleted, either by [delete] being called (on the server)
     or when the client receives confirmation of the deletion from the server. *)
 
+val can_send : (_, _, _) t -> bool
+(** [can_send t] is [true] if the proxy can still be used in out-going messages.
+    It becomes false after calling {!delete} or {!shutdown_send}. *)
+
 (** {2 Functions for use by generated code}
 
     You should not need to use these functions directly.
@@ -112,7 +116,8 @@ module Service_handler : sig
 end
 
 val id : _ t -> int32
-(** [id t] is [t]'s object ID. Use this to refer to the object in a message. *)
+(** [id t] is [t]'s object ID. Use this to refer to the object in a message.
+    @raise Invalid_argument if the proxy has been destroyed (can no longer be used for sending). *)
 
 val id_opt : _ t option -> int32
 (** Like [id] but returns 0l for [None]. *)

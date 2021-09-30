@@ -119,7 +119,7 @@ let parse ~fds cs =
         NE.get_uint16 cs 6
       )
     in
-    if Cstruct.len cs >= len then (
+    if Cstruct.length cs >= len then (
       Some { buffer = Cstruct.sub cs 0 len; next = 8; fds }
     ) else (
       None

@@ -52,6 +52,8 @@ let version t = t.version
 
 let metadata t = t.handler#metadata
 
+let can_send t = t.can_send
+
 let ty (type a) t =
   let (module M : Metadata.S with type t = a) = metadata t in
   M.T
@@ -108,7 +110,9 @@ module Service_handler = struct
     proxy
 end
 
-let id t = t.id
+let id t =
+  if t.can_send then t.id
+  else Fmt.invalid_arg "Attempt to use %a after destroying it" pp t
 
 let id_opt = function
   | None -> 0l
