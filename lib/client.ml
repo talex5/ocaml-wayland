@@ -64,3 +64,5 @@ let sync t =
   result
 
 let wl_display t = t.wl_display
+
+let set_paused t = Connection.set_paused t.conn

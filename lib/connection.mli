@@ -8,3 +8,5 @@ val connect :
   ('role t * ('a, 'v, 'role) Proxy.t)
 
 val closed : [< `Client | `Server ] t -> (unit, exn) Lwt_result.t
+
+val set_paused : _ t -> bool -> unit

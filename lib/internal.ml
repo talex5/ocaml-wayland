@@ -4,6 +4,8 @@ module Objects = Map.Make(Int32)
 
 type 'role connection = {
   transport : S.transport;
+  mutable paused : unit Lwt.t;                  (* Wait for this to resolve before reading next event. *)
+  mutable unpause : unit -> unit;
   role : 'role;
   mutable objects : 'role generic_proxy Objects.t;
   mutable free_ids : int32 list;
