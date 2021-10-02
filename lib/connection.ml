@@ -61,6 +61,19 @@ let listen t =
        Lwt.return_unit;
     )
 
+let clean_up t =
+  t.objects |> Objects.iter (fun _ (Generic obj) ->
+      obj.on_delete |> Queue.iter (fun f ->
+          try f ()
+          with ex ->
+            Log.warn (fun f -> f "Error from %a's on_delete handler called at end-of-connection: %a"
+                         pp_proxy obj
+                         Fmt.exn ex)
+        );
+      Queue.clear obj.on_delete
+    );
+  Lwt.return_unit
+
 let connect ~trace role transport handler =
   let closed, set_closed = Lwt.wait () in
   let t = {
@@ -78,7 +91,11 @@ let connect ~trace role transport handler =
     trace = Proxy.trace trace;
   } in
   let display_proxy = Proxy.add_root t (handler :> _ Proxy.Handler.t) in
-  Lwt.async (fun () -> listen t);
+  Lwt.async (fun () ->
+      Lwt.finalize
+        (fun () -> listen t)
+        (fun () -> clean_up t)
+    );
   (t, display_proxy)
 
 let closed t = t.closed

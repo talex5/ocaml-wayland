@@ -33,7 +33,8 @@ val delete : (_, _, [< `Client | `Server]) t -> unit
 
 val on_delete : (_, _, _) t -> (unit -> unit) -> unit
 (** [on_delete t f] calls [f] when [t] is deleted, either by [delete] being called (on the server)
-    or when the client receives confirmation of the deletion from the server. *)
+    or when the client receives confirmation of the deletion from the server.
+    [f] will also be called if the connection ends. *)
 
 val can_send : (_, _, _) t -> bool
 (** [can_send t] is [true] if the proxy can still be used in out-going messages.
