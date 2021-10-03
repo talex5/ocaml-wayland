@@ -188,7 +188,8 @@ let delete t =
           send display msg
         )
     end;
-    Queue.iter (fun f -> f ()) t.on_delete
+    Queue.iter (fun f -> f ()) t.on_delete;
+    Queue.clear t.on_delete
   | _ -> Fmt.failwith "Object %a is not registered!" pp t
 
 let delete_other proxy id =
@@ -199,7 +200,8 @@ let delete_other proxy id =
     proxy.can_recv <- false;
     conn.objects <- Objects.remove id conn.objects;
     Internal.free_id conn id;
-    Queue.iter (fun f -> f ()) proxy.on_delete
+    Queue.iter (fun f -> f ()) proxy.on_delete;
+    Queue.clear proxy.on_delete
 
 let unknown_event = Fmt.strf "<unknown event %d>"
 let unknown_request = Fmt.strf "<unknown request %d>"
