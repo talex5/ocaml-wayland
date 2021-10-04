@@ -36,6 +36,10 @@ let of_socket socket = object (_ : S.transport)
         | Unix.Unix_error(Unix.ECONNRESET, _, _) -> Lwt.return (0, [])
         | ex -> Lwt.fail ex
       )
+
+  method pp f =
+    let fd : int = Obj.magic (Lwt_unix.unix_file_descr socket) in
+    Fmt.pf f "%d" fd
 end
 
 let socket_path ?wayland_display () =

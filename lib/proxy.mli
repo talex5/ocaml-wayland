@@ -166,6 +166,9 @@ end
 
 val pp : _ t Fmt.t
 
+val pp_transport : _ t Fmt.t
+(** [pp_transport] calls {!S.transport#pp} on the proxy's transport. *)
+
 (**/**)
 
 val add_root : 'role Internal.connection -> ('a, 'v, 'role) #Handler.t -> ('a, 'v, 'role) t
