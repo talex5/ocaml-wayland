@@ -9,6 +9,9 @@ class type transport = object
   (** [recv buffer] reads incoming data from the remote peer.
       The data is read into [buffer] and the method returns the number of bytes
       read and the list of attached file descriptors. *)
+
+  method pp : Format.formatter -> unit
+  (** Can be used for logging. *)
 end
 
 type ('a, 'role) user_data = ..

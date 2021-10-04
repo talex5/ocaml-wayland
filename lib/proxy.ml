@@ -222,3 +222,6 @@ let trace (type r) (module T : TRACE with type role = r) = {
   inbound = T.inbound;
   outbound = T.outbound;
 }
+
+let pp_transport f t =
+  t.conn.transport#pp f
