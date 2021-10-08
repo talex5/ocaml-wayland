@@ -109,3 +109,10 @@ let set_paused t = function
       t.paused <- paused;
       t.unpause <- Lwt.wakeup set_paused
     )
+
+let dump f t =
+  let pp_item f (_id, Generic proxy) = pp_proxy f proxy in
+  Fmt.pf f "@[<v2>Connection on %t with %d objects:@,%a@]"
+    t.transport#pp
+    (Objects.cardinal t.objects)
+    (Fmt.Dump.list pp_item) (Objects.bindings t.objects)

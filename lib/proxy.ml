@@ -203,8 +203,8 @@ let delete_other proxy id =
     Queue.iter (fun f -> f ()) proxy.on_delete;
     Queue.clear proxy.on_delete
 
-let unknown_event = Fmt.strf "<unknown event %d>"
-let unknown_request = Fmt.strf "<unknown request %d>"
+let unknown_event = Fmt.str "<unknown event %d>"
+let unknown_request = Fmt.str "<unknown request %d>"
 
 let lookup_other (t : _ t) id =
   match Objects.find_opt id t.conn.objects with

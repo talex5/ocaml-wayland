@@ -35,7 +35,7 @@ module S = struct
   let comp_name = 1l
 
   let log t fmt =
-    fmt |> Fmt.kstrf @@ fun msg ->
+    fmt |> Fmt.kstr @@ fun msg ->
     Logs.info (fun f -> f "Server: %s" msg);
     t.log <- msg :: t.log
 
