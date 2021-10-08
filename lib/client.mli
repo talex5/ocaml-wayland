@@ -26,3 +26,6 @@ val wl_display : t -> [`V1] Wayland_client.Wl_display.t
 val set_paused : t -> bool -> unit
 (** [set_paused t] sets the paused state.
     No further incoming messages will be dispatched while [t] is paused. *)
+
+val dump : t Fmt.t
+(** Dump the state of the connection for debugging. *)

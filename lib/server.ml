@@ -49,3 +49,4 @@ let connect ?(trace=(module Trace : TRACE)) transport handler =
 let wl_display t = t.wl_display
 
 let closed t = Connection.closed t.conn
+let dump f t = Connection.dump f t.conn

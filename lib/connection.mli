@@ -10,3 +10,5 @@ val connect :
 val closed : [< `Client | `Server ] t -> (unit, exn) Lwt_result.t
 
 val set_paused : _ t -> bool -> unit
+
+val dump : _ t Fmt.t

@@ -16,3 +16,6 @@ val wl_display : t -> [`V1] Wayland_server.Wl_display.t
 val closed : t -> (unit, exn) Lwt_result.t
 (** [closed t] resolves when the connection is closed (either due to the other side closing it normally
     or because an exception was raised. *)
+
+val dump : t Fmt.t
+(** Dump the state of the connection for debugging. *)

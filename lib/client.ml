@@ -66,3 +66,4 @@ let sync t =
 let wl_display t = t.wl_display
 
 let set_paused t = Connection.set_paused t.conn
+let dump f t = Connection.dump f t.conn
