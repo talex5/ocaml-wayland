@@ -154,7 +154,7 @@ let pop_and_show_arg f t : Metadata.param -> unit = function
   | `New_ID (Some _) ->
     Fmt.pf f "+%lu" (get_int t)
   | `String ->
-    Fmt.(option ~none:(unit "null") Dump.string) f (get_string_opt t)
+    Fmt.(option ~none:(any "null") Dump.string) f (get_string_opt t)
   | `Array ->
     Fmt.Dump.string f (get_array t)
   | `FD ->

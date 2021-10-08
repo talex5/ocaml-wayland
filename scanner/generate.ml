@@ -3,7 +3,7 @@ open Schema
 let module_name = String.capitalize_ascii
 
 let full_module_name (proto : Protocol.t) (iface : Interface.t) =
-  Fmt.strf "%s_proto.%s" (String.capitalize_ascii proto.name) (module_name iface.name)
+  Fmt.str "%s_proto.%s" (String.capitalize_ascii proto.name) (module_name iface.name)
 
 let mangle name =
   let name =
@@ -37,7 +37,7 @@ let pp_enum_module (iface : Interface.t) f (arg:Arg.t) =
     | x -> x
   in
   Fmt.pf f "Imports.%a"
-    Fmt.(list ~sep:(unit ".") string) enum
+    Fmt.(list ~sep:(any ".") string) enum
 
 let pp_tvars f = function
   | 0 -> ()
@@ -92,7 +92,7 @@ let pp_arg ~role ~next_tvar iface f arg =
 
 let pp_sig ~role ~next_tvar iface f = function
   | [] -> Fmt.string f "unit"
-  | args -> Fmt.(list ~sep:(unit " ->@ ") (pp_arg ~role ~next_tvar iface) ++ any " ->@ unit") f args
+  | args -> Fmt.(list ~sep:(any " ->@ ") (pp_arg ~role ~next_tvar iface) ++ any " ->@ unit") f args
 
 let pp_args ~role ~with_types =
   let pp_arg f arg =
@@ -115,8 +115,8 @@ let variant_of_ty (arg : Arg.t) =
   | `Int -> "`Int"
   | `String -> "`String"
   | `Array -> "`Array"
-  | `Object interface -> Fmt.strf "`Object (%a)" Fmt.Dump.(option string) interface
-  | `New_ID interface -> Fmt.strf "`New_ID (%a)" Fmt.Dump.(option string) interface
+  | `Object interface -> Fmt.str "`Object (%a)" Fmt.Dump.(option string) interface
+  | `New_ID interface -> Fmt.str "`New_ID (%a)" Fmt.Dump.(option string) interface
   | `Fixed -> "`Fixed"
   | `FD -> "`FD"
 
@@ -127,7 +127,7 @@ let pp_arg_info =
   Fmt.(list ~sep:semi) pp_arg
 
 let pp_versions f (min, max) =
-  Fmt.(list ~sep:(unit " | ") (fmt "`V%d"))
+  Fmt.(list ~sep:(any " | ") (fmt "`V%d"))
     f (List.init (max + 1 - min) (fun x -> min + x))
 
 let op_info name f messages =
@@ -186,10 +186,10 @@ let pp_strings f args =
   args
   |> List.filter_map (fun (a : Arg.t) ->
       match a.ty with
-      | `New_ID None -> Some (Fmt.strf "(Some (Proxy.Service_handler.interface (fst %s)))" (mangle a.name))
+      | `New_ID None -> Some (Fmt.str "(Some (Proxy.Service_handler.interface (fst %s)))" (mangle a.name))
       | `String ->
         if a.allow_null then Some (mangle a.name)
-        else Some (Fmt.strf "(Some %s)" (mangle a.name))
+        else Some (Fmt.str "(Some %s)" (mangle a.name))
       | _ -> None
     )
   |> Fmt.(list ~sep:semi string) f
@@ -296,7 +296,7 @@ let pp_enum_link (protocol : Protocol.t) (iface : Interface.t) f (enum : Enum.t)
 
 let pp_msg_handler_sig ~role ~iface ~pp_self f (msg : Message.t) =
   let next_tvar = ref 0 in
-  let _args = Fmt.strf "@[%a@]" (pp_sig ~role ~next_tvar iface) msg.args in
+  let _args = Fmt.str "@[%a@]" (pp_sig ~role ~next_tvar iface) msg.args in
   let n_tvars = !next_tvar in
   next_tvar := 0;
   Fmt.pf f "@[@[%a@]%t %a@]@,"
