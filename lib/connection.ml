@@ -16,10 +16,16 @@ let rec process_recv_buffer t recv_buffer =
       | Some (Generic proxy) ->
         let msg = Msg.cast msg in
         t.trace.inbound proxy msg;
-        if proxy.can_recv then
-          proxy.handler#dispatch proxy msg
-        else
+        if proxy.can_recv then (
+          try
+            proxy.handler#dispatch proxy msg
+          with ex ->
+            let bt = Printexc.get_raw_backtrace () in
+            Log.err (fun f -> f "Uncaught exception handling incoming message for %a:@,%a"
+                        pp_proxy proxy Fmt.exn_backtrace (ex, bt))
+        ) else (
           Fmt.failwith "Received message for %a, which was shut down!" pp_proxy proxy
+        )
     end;
     Recv_buffer.update_consumer recv_buffer (Msg.length msg);
     (* Unix.sleepf 0.001; *)
