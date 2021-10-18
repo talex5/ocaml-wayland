@@ -1,4 +1,10 @@
-val of_socket : Lwt_unix.file_descr -> S.transport
+type t = <
+  S.transport;
+  close : unit Lwt.t;
+  socket : Lwt_unix.file_descr
+>
+
+val of_socket : Lwt_unix.file_descr -> t
 
 val socket_path : ?wayland_display:string -> unit -> string
 (** [socket_path ()] returns the path to the wayland socket to use.
@@ -10,7 +16,7 @@ val socket_path : ?wayland_display:string -> unit -> string
     @param wayland_display Use this as the value of $WAYLAND_DISPLAY
                            instead of reading it from the environment. *)
 
-val connect : unit -> S.transport Lwt.t
+val connect : unit -> t Lwt.t
 (** [connect ()] connects to the Wayland server's socket:
     {ol
     {- If $WAYLAND_SOCKET is set then that file descriptor is used.}

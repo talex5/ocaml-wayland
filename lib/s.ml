@@ -10,6 +10,14 @@ class type transport = object
       The data is read into [buffer] and the method returns the number of bytes
       read and the list of attached file descriptors. *)
 
+  method shutdown : unit Lwt.t
+  (** Shut down the sending side of the connection. This will cause the peer to read end-of-file. *)
+
+  method up : bool
+  (** [up] is [true] until the transport has sent or received an end-of-file
+      (indicating that the connection is being shut down).
+      This can be accessed via {!Proxy.transport_up}. *)
+
   method pp : Format.formatter -> unit
   (** Can be used for logging. *)
 end

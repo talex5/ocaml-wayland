@@ -40,6 +40,10 @@ val can_send : (_, _, _) t -> bool
 (** [can_send t] is [true] if the proxy can still be used in out-going messages.
     It becomes false after calling {!delete} or {!shutdown_send}. *)
 
+val transport_up : (_, _, _) t -> bool
+(** [transport_up t] is [true] if [t]'s connection is still active.
+    This is [false] after we read or send end-of-file on the connection. *)
+
 (** {2 Functions for use by generated code}
 
     You should not need to use these functions directly.

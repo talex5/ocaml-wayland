@@ -11,6 +11,7 @@ val connect : ?trace:(module TRACE) ->
     It spawns a background thread to handle incoming messages.
     It returns the new connection and a promise that resolves when
     the connection ends.
+    The caller is responsible for closing [transport] when done.
     @param trace Used to trace all messages sent and received.
                  The default tracer logs messages at debug level, and the log's source is set to debug level
                  if $WAYLAND_DEBUG is "1" or "client" the first time {!connect} is called. *)

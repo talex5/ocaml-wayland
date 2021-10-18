@@ -130,10 +130,16 @@ module S = struct
       end
     in
     Lwt.async (fun () ->
-        let open Lwt.Infix in
-        Server.closed s >>= function
-        | Ok () -> Lwt.return_unit
-        | Error ex -> raise ex
+        Lwt.finalize
+          (fun () ->
+             let open Lwt.Infix in
+             Server.closed s >>= function
+             | Ok () -> Lwt.return_unit
+             | Error ex -> raise ex
+          )
+          (fun () ->
+             socket#close
+          )
       );
     t
 
@@ -141,10 +147,12 @@ module S = struct
 end
 
 let test_simple _ () =
+  let test_over, set_test_over = Lwt.wait () in
   let socket_c, socket_s = Lwt_unix.(socketpair PF_UNIX SOCK_STREAM 0) in
-  let c, conn_closed = Unix_transport.of_socket socket_c |> Client.connect in
+  let transport = Unix_transport.of_socket socket_c  in
+  let c, conn_closed = Client.connect transport in
   Lwt.on_success conn_closed (function
-      | Ok () -> ()
+      | Ok () -> Lwt.wakeup set_test_over ()
       | Error ex -> raise ex
     );
   let server = Unix_transport.of_socket socket_s |> S.connect in
@@ -165,7 +173,11 @@ let test_simple _ () =
     "Created surface 1";
     "Surface 1 input region <- (10, 20)+(30, 40)";
   ] @@ S.get_log server;
-  Lwt.return ()
+  Alcotest.(check bool) "Still up" true (Proxy.transport_up region);
+  let* () = transport#shutdown in
+  Alcotest.(check bool) "Disconnecting" false (Proxy.transport_up region);
+  let* () = test_over in
+  transport#close
 
 let () =
   Logs.set_reporter (Logs_fmt.reporter ());
