@@ -3,6 +3,12 @@ open Lwt.Syntax
 (* SIGPIPE makes no sense in a modern application. *)
 let () = Sys.(set_signal sigpipe Signal_ignore)
 
+type t = <
+  S.transport;
+  close : unit Lwt.t;
+  socket : Lwt_unix.file_descr
+>
+
 let xdg_runtime_dir () =
   match Sys.getenv_opt "XDG_RUNTIME_DIR" with
   | Some x -> x
@@ -14,7 +20,9 @@ let make_display_absolute x =
   else
     x
 
-let of_socket socket = object (_ : S.transport)
+let of_socket socket = object (_ : #S.transport)
+  val mutable up = true
+
   method send data fds =
     let v = Lwt_unix.IO_vectors.create () in
     let { Cstruct.buffer; off; len } = data in
@@ -31,11 +39,30 @@ let of_socket socket = object (_ : S.transport)
     let io_vectors = Lwt_unix.IO_vectors.create () in
     Lwt_unix.IO_vectors.append_bigarray io_vectors buffer off len;
     Lwt.catch
-      (fun () -> Lwt_unix.recv_msg ~socket ~io_vectors)
+      (fun () ->
+         let+ (got, fds) = Lwt_unix.recv_msg ~socket ~io_vectors in
+         if got = 0 then up <- false;
+         (got, fds)
+      )
       (function
-        | Unix.Unix_error(Unix.ECONNRESET, _, _) -> Lwt.return (0, [])
+        | Unix.Unix_error(Unix.ECONNRESET, _, _) ->
+          up <- false;
+          Lwt.return (0, [])
         | ex -> Lwt.fail ex
       )
+
+  method shutdown =
+    up <- false;
+    Lwt_unix.shutdown socket Lwt_unix.SHUTDOWN_SEND;
+    Lwt.return_unit
+
+  method up = up
+
+  method socket = socket
+
+  method close =
+    up <- false;
+    Lwt_unix.close socket
 
   method pp f =
     let fd : int = Obj.magic (Lwt_unix.unix_file_descr socket) in
