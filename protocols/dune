@@ -1,57 +1,82 @@
+(* -*- tuareg -*- *)
+
+let library = {|
 (library
-  (name wayland_protocols)
-  (public_name wayland.protocols)
-  (libraries wayland))
+ (name wayland_protocols)
+ (public_name wayland.protocols)
+ (libraries wayland))|}
 
-(rule
- (targets xdg_shell_client.ml xdg_shell_server.ml xdg_shell_proto.ml)
- (deps   xdg-shell.xml)
- (action (run %{bin:wayland-scanner-ocaml} --open Wayland.Wayland_proto %{deps})))
+let pkgdatadir =
+  let out = Jbuild_plugin.V1.run_and_read_lines "pkg-config --variable=pkgdatadir wayland-protocols" in
+  match out with
+  | [path] -> path
+  | _ -> ""
 
-(rule
- (targets gtk_primary_selection_client.ml gtk_primary_selection_server.ml gtk_primary_selection_proto.ml)
- (deps   gtk-primary-selection.xml)
- (action (run %{bin:wayland-scanner-ocaml} --open Wayland.Wayland_proto %{deps})))
+let wayland_protocols =
+  [
+    `Stable ("xdg-shell", None, []);
+    `Unstable ("linux-dmabuf", None, "v1", []);
+    `Unstable ("primary-selection", Some "wp-primary-selection", "v1", []);
+    `Unstable ("xdg-decoration", None, "v1", ["Xdg_shell_proto"]);
+    `Unstable ("xdg-output", None, "v1", []);
+  ]
 
-(rule
- (targets wp_primary_selection_unstable_v1_client.ml wp_primary_selection_unstable_v1_server.ml wp_primary_selection_unstable_v1_proto.ml)
- (deps   primary-selection-unstable-v1.xml)
- (action (run %{bin:wayland-scanner-ocaml} --open Wayland.Wayland_proto %{deps})))
+let ( / ) = Filename.concat
+let names f name alias =
+  let map = String.map (function '-' -> '_' | c -> c) in
+  match alias with None -> f name, map (f name) | Some alias -> f name, map (f alias)
 
+let wayland_protocols_rule protocol =
+  let deps, targets, mods = match protocol with
+    | `Stable (n, alias, mods) ->
+      let name, alias = names Fun.id n alias in
+      pkgdatadir / "stable" / n / name ^ ".xml", alias, mods
+    | `Staging (n, alias, v, mods) ->
+      let name, alias = names (fun n -> Printf.sprintf "%s-%s" n v) n alias in
+      pkgdatadir / "staging" / n / name  ^ ".xml", alias, mods
+    | `Unstable (n, alias, v, mods) ->
+      let name, alias = names (fun n -> Printf.sprintf "%s-unstable-%s" n v) n alias in
+      pkgdatadir / "unstable" / n / name ^ ".xml", alias, mods
+  in
+  let mods = String.concat "," ("Wayland.Wayland_proto" :: mods) in
+  Printf.sprintf {|
 (rule
- (targets xdg_output_unstable_v1_client.ml xdg_output_unstable_v1_server.ml xdg_output_unstable_v1_proto.ml)
- (deps   xdg-output-unstable-v1.xml)
- (action (run %{bin:wayland-scanner-ocaml} --open Wayland.Wayland_proto %{deps})))
+ (targets %s_client.ml
+          %s_server.ml
+          %s_proto.ml)
+ (action (run %%{bin:wayland-scanner-ocaml} --open %s %s)))|}
+    targets targets targets mods deps
 
-(rule
- (targets xdg_decoration_unstable_v1_client.ml xdg_decoration_unstable_v1_server.ml xdg_decoration_unstable_v1_proto.ml)
- (deps   xdg-decoration-unstable-v1.xml)
- (action (run %{bin:wayland-scanner-ocaml} --open Wayland.Wayland_proto,Xdg_shell_proto %{deps})))
+let protocols =
+  [
+    `Stable ("gtk-primary-selection", None, []);
+    `Stable ("server-decoration", None, []);
+    `Stable ("wayland-drm", Some "drm", []);
+    `Unstable ("wlr-screencopy", None, "v1", []);
+  ]
 
+let protocols_rule protocol =
+  let deps, targets, mods = match protocol with
+    | `Stable (n, alias, mods) ->
+      let n, alias = names Fun.id n alias in n, alias, mods
+    | `Unstable (n, alias, v, mods) ->
+      let n, alias = names (fun n -> Printf.sprintf "%s-unstable-%s" n v) n alias in
+      n, alias, mods
+  in
+  let mods = String.concat "," ("Wayland.Wayland_proto" :: mods) in
+  Printf.sprintf {|
 (rule
- (targets server_decoration_client.ml
-          server_decoration_server.ml
-          server_decoration_proto.ml)
- (deps   server-decoration.xml)
- (action (run %{bin:wayland-scanner-ocaml} --open Wayland.Wayland_proto %{deps})))
+ (targets %s_client.ml
+          %s_server.ml
+          %s_proto.ml)
+ (deps %s.xml)
+ (action (run %%{bin:wayland-scanner-ocaml} --open %s %%{deps})))|}
+    targets targets targets deps mods
 
-(rule
- (targets wlr_screencopy_unstable_v1_client.ml
-          wlr_screencopy_unstable_v1_server.ml
-          wlr_screencopy_unstable_v1_proto.ml)
- (deps   wlr-screencopy-unstable-v1.xml)
- (action (run %{bin:wayland-scanner-ocaml} --open Wayland.Wayland_proto %{deps})))
+let rules =
+  Printf.sprintf "%s\n%s\n%s\n"
+    library
+    (String.concat "\n" (List.map wayland_protocols_rule wayland_protocols))
+    (String.concat "\n" (List.map protocols_rule protocols))
 
-(rule
- (targets drm_client.ml
-          drm_server.ml
-          drm_proto.ml)
- (deps   wayland-drm.xml)
- (action (run %{bin:wayland-scanner-ocaml} --open Wayland.Wayland_proto %{deps})))
-
-(rule
- (targets linux_dmabuf_unstable_v1_client.ml
-          linux_dmabuf_unstable_v1_server.ml
-          linux_dmabuf_unstable_v1_proto.ml)
- (deps   linux-dmabuf-unstable-v1.xml)
- (action (run %{bin:wayland-scanner-ocaml} --open Wayland.Wayland_proto %{deps})))
+let () = Jbuild_plugin.V1.send rules

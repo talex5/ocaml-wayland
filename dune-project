@@ -14,6 +14,8 @@
  (depends
   (alcotest-lwt (and (>= 1.2.3) :with-test))
   (ocaml (>= 4.08.0))
+  conf-pkg-config
+  conf-wayland-protocols
   (xmlm (>= 1.3.0))
   (lwt (>= 5.4.0))
   (logs (>= 0.7.0))
