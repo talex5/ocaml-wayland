@@ -24,9 +24,9 @@ let opens =
     ~doc:"Extra modules to open"
     ["open"]
 
-let scan = Term.(const scan $ opens $ internal $ spec_file)
-
-let term_exit (x : unit Term.result) = Term.exit x
+let scan =
+  let info = Cmd.info "wayland-scanner-ocaml" in
+  Cmd.v info Term.(const scan $ opens $ internal $ spec_file)
 
 let () =
-  term_exit @@ Term.eval (scan, Term.info "wayland-scanner-ocaml")
+  exit @@ Cmd.eval scan
