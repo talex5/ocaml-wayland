@@ -131,6 +131,7 @@ let () =
     in
     let toplevel = Xdg_surface.get_toplevel xdg_surface @@ object
         inherit [_] Xdg_toplevel.v1
+        method on_configure_bounds _ ~width:_ ~height:_ = ()
         method on_configure _ ~width ~height ~states:_ =
           t.width <- if width = 0l then 640 else Int32.to_int width;
           t.height <- if height = 0l then 480 else Int32.to_int height
