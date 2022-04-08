@@ -59,7 +59,7 @@ module Handler : sig
       Typically, a constructor will let the user pick from a range of versions
       for ['v], which will then be constrained by the [spawn] call. *)
 
-  val cast_version : ('a, _, 'role) t -> ('a, _, 'role) t
+  val cast_version : ('a, _, 'role) #t -> ('a, _, 'role) t
   (** If the version rules turn out to be too restrictive, this can be used to disable them.
       Using this incorrectly may lead to a protocol error (such as receiving an event for which
       no handler was registered). *)
