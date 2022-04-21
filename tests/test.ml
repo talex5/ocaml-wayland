@@ -1,4 +1,4 @@
-open Lwt.Syntax
+open Eio.Std
 open Wayland
 
 type rect = {
@@ -97,7 +97,7 @@ module S = struct
       method on_create_surface _ surface = make_surface t surface
     end
 
-  let connect socket =
+  let connect ~sw socket =
     let t = {
       serial = 0l;
       next_surface = 1;
@@ -108,8 +108,8 @@ module S = struct
       t.serial <- Int32.succ i;
       i
     in
-    let s : Server.t =
-      Server.connect socket @@ object
+    let s =
+      Server.connect ~sw socket @@ object
         inherit [_] Wl_display.v1
         method on_sync _ cb =
           Proxy.Handler.attach cb @@ new Wl_callback.v1;
@@ -130,35 +130,20 @@ module S = struct
           Wl_registry.global reg ~name:comp_name ~interface:"wl_compositor" ~version:1l
       end
     in
-    Lwt.async (fun () ->
-        Lwt.finalize
-          (fun () ->
-             let open Lwt.Infix in
-             Server.closed s >>= function
-             | Ok () -> Lwt.return_unit
-             | Error ex -> raise ex
-          )
-          (fun () ->
-             socket#close
-          )
-      );
+    ignore (s : Server.t);
     t
 
   let get_log t = List.rev t.log
 end
 
-let test_simple _ () =
-  let test_over, set_test_over = Lwt.wait () in
-  let socket_c, socket_s = Lwt_unix.(socketpair PF_UNIX SOCK_STREAM 0) in
+let test_simple () =
+  Switch.run @@ fun sw ->
+  let socket_c, socket_s = Eio_unix.Net.socketpair_stream ~sw () in
   let transport = Unix_transport.of_socket socket_c  in
-  let c, conn_closed = Client.connect transport in
-  Lwt.on_success conn_closed (function
-      | Ok () -> Lwt.wakeup set_test_over ()
-      | Error ex -> raise ex
-    );
-  let server = Unix_transport.of_socket socket_s |> S.connect in
+  let c = Client.connect ~sw transport in
+  let server = Unix_transport.of_socket socket_s |> S.connect ~sw in
   let open Wayland.Wayland_client in
-  let* reg = Registry.of_display c in
+  let reg = Registry.of_display c in
   let comp = Registry.bind reg @@ new Wl_compositor.v1 in
   let surface = Wl_compositor.create_surface comp @@ object
       inherit [_] Wl_surface.v1
@@ -169,25 +154,22 @@ let test_simple _ () =
   let region = Wl_compositor.create_region comp @@ new Wl_region.v1 in
   Wl_region.add region ~x:10l ~y:20l ~width:30l ~height:40l;
   Wl_surface.set_input_region surface ~region:(Some region);
-  let* () = Client.sync c in
+  Client.sync c;
   Alcotest.(check (list string)) "Check log" [
     "Created surface 1";
     "Surface 1 input region <- (10, 20)+(30, 40)";
   ] @@ S.get_log server;
   Alcotest.(check bool) "Still up" true (Proxy.transport_up region);
-  let* () = transport#shutdown in
-  Alcotest.(check bool) "Disconnecting" false (Proxy.transport_up region);
-  let* () = test_over in
-  transport#close
+  Client.stop c;
+  Alcotest.(check bool) "Disconnecting" false (Proxy.transport_up region)
 
 let () =
   Logs.set_reporter (Logs_fmt.reporter ());
   Logs.(set_level (Some Info));
-  Lwt_main.run begin
-    let open Alcotest_lwt in
-    run "wayland" [
-      "protocol", [
-        test_case "simple" `Quick test_simple;
-      ];
-    ]
-  end
+  Eio_main.run @@ fun _env ->
+  let open Alcotest in
+  run "wayland" [
+    "protocol", [
+      test_case "simple" `Quick test_simple;
+    ];
+  ]

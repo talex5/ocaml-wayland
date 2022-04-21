@@ -1,3 +1,4 @@
+open Eio.Std
 open Wayland_client
 
 let log_msg_src = Logs.Src.create "wayland-client" ~doc:"Wayland client messages"
@@ -40,9 +41,9 @@ module Trace : TRACE = struct
       )
 end
 
-let connect ?(trace=(module Trace : TRACE)) transport =
+let connect ?(trace=(module Trace : TRACE)) ~sw transport =
   Lazy.force init_logging;
-  let conn, wl_display = Connection.connect ~trace `Client transport @@ object
+  let conn, wl_display = Connection.connect ~sw ~trace `Client transport @@ object
       inherit [_] Wl_display.v1
 
       method on_error _ ~object_id ~code ~message =
@@ -52,18 +53,18 @@ let connect ?(trace=(module Trace : TRACE)) transport =
         Proxy.delete_other proxy id
     end
   in
-  { conn; wl_display }, Connection.closed conn
+  { conn; wl_display }
 
 let sync t =
-  let result, set_result = Lwt.wait () in
+  let result, set_result = Promise.create () in
   let _ : _ Wl_callback.t = Wl_display.sync t.wl_display @@ object
       inherit [_] Wl_callback.v1
-      method on_done ~callback_data:_ = Lwt.wakeup set_result ()
+      method on_done ~callback_data:_ = Promise.resolve set_result ()
     end
   in
-  result
+  Promise.await result
 
 let wl_display t = t.wl_display
 
-let set_paused t = Connection.set_paused t.conn
 let dump f t = Connection.dump f t.conn
+let stop t = Connection.stop t.conn
