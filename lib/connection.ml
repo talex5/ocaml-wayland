@@ -12,7 +12,7 @@ let rec process_recv_buffer t recv_buffer =
     begin
       let obj = Msg.obj msg in
       match Objects.find_opt obj t.objects with
-      | None -> Fmt.failwith "No such object %ld" obj
+      | None -> Fmt.failwith "No such object %lu (op=%d)" obj (Msg.op msg);
       | Some (Generic proxy) ->
         let msg = Msg.cast msg in
         t.trace.inbound proxy msg;
