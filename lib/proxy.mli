@@ -3,19 +3,19 @@
 type ('a, +'v, 'role) t
 (** An [('a, 'v, 'role) t] is a proxy used by ['role] to send messages to an object with interface ['a] and version in ['v]. *)
 
-type ('a, 'v, 'role) proxy := ('a, 'v, 'role) t               (* Alias for use inside this file only *)
-
-type ('v, 'role) generic = Proxy : ('a, 'v, 'role) t -> ('v, 'role) generic
-(** A proxy whose type isn't known statically. Use {!ty} and pattern matching to recover the type. *)
-
 val user_data : ('a, _, 'role) t -> ('a, 'role) S.user_data
 (** [user_data t] returns the data attached to the proxy when it was created.
+
+    This just calls the application's [user_data] method, if any.
     Returns [No_data] if nothing was attached. *)
 
 val cast_version : ('a, _, 'role) t -> ('a, _, 'role) t
 (** If the version rules turn out to be too restrictive, this can be used to disable them.
+
     Using this incorrectly may lead to a protocol error (such as receiving an event for which
     no handler was registered). *)
+
+(** {2 Metadata} *)
 
 val version : _ t -> int32
 
@@ -44,49 +44,75 @@ val transport_up : (_, _, _) t -> bool
 (** [transport_up t] is [true] if [t]'s connection is still active.
     This is [false] after we read or send end-of-file on the connection. *)
 
-(** {2 Functions for use by generated code}
+(** {2 Handlers} *)
 
-    You should not need to use these functions directly.
-    Instead, run wayland-scanner-ocaml to generate typed wrappers and use the wrappers instead. *)
+type ('a, 'v, 'role) proxy := ('a, 'v, 'role) t               (** Alias for use inside this file only *)
 
+(** Handlers for normal objects. *)
 module Handler : sig
   class type ['a, 'v, 'role] t = object
     method user_data : ('a, 'role) S.user_data
     method metadata : (module Metadata.S with type t = 'a)
     method dispatch : ('a, 'v, 'role) proxy -> ('a, [`R]) Msg.t -> unit
   end
-  (** An [('a, 'v) t] handles incoming messages for an object of type ['a].
+  (** An [('a, 'v, 'role) t] handles incoming messages for an object of type ['a].
+
       Typically, a constructor will let the user pick from a range of versions
-      for ['v], which will then be constrained by the [spawn] call. *)
+      for ['v], which will then be constrained by the [spawn] call.
+      The generated bindings provide implementations of this where [dispatch] collects the
+      arguments and passes them to an appopriately-typed virtual method,
+      which must be implmented by the application. *)
+
+  val attach : ('a, 'v, 'role) proxy -> ('a, 'v, 'role) #t -> unit
+  (** [attach proxy t] sets [t] as the handler for [proxy].
+
+      Any method argument that corresponds to a new object will arrive as a half-initialsed proxy
+      (created by the generated bindings using {!accept_new}).
+      This function must be called immediately (before switching threads or using the proxy)
+      so that any future events addressed to this object can be handled. *)
 
   val cast_version : ('a, _, 'role) #t -> ('a, _, 'role) t
   (** If the version rules turn out to be too restrictive, this can be used to disable them.
       Using this incorrectly may lead to a protocol error (such as receiving an event for which
       no handler was registered). *)
 
+  (** {2 Functions for use by generated code} *)
+
   val accept_new :
     (_, 'v, [< `Client | `Server ] as 'role) proxy ->
     (module Metadata.S with type t = 'a) ->
     int32 -> ('a, 'v, 'role) proxy
   (** [accept_new parent id] registers a new object, with an ID allocated by the peer.
-      The resulting proxy is in a half-initialised state.
-      You must call {!attach} on it before switching threads or doing anything else with it. *)
 
-  val attach : ('a, 'v, 'role) proxy -> ('a, 'v, 'role) #t -> unit
-  (** [attach proxy t] sets [t] as the handler for [proxy],
-      which must be a partly initialised proxy returned by [accept_new]. *)
+      The generated bindings call this when receiving a new object,
+      before passsing the resulting half-initialised proxy to the application code. *)
 end
 
+(** Handlers for services (objects added via the registry). *)
 module Service_handler : sig
   class type ['a, 'v, 'role] t = object
     inherit ['a, 'v, 'role] Handler.t
     method min_version : int32
     method max_version : int32
   end
-  (** An [('a, 'v) t] handles incoming messages for a service object of type ['a].
+  (** An [('a, 'v, 'role) t] handles incoming messages for a service object of type ['a].
+
       This type is used when binding a service, to choose the version.
       All other handlers get the version from elsewhere (inherited from their parent
       object). *)
+
+  val attach_proxy : ('a, [`Unknown], 'role) proxy -> ('a, ([> `V1] as 'v), 'role) #t -> ('a, 'v, 'role) proxy
+  (** [attach_proxy p t] sets [t] as the handler for [p].
+
+      Any method argument that corresponds to a new object will arrive as a half-initialsed proxy
+      (created by the generated bindings using {!accept_new}).
+      This function must be called immediately (before switching threads or using the proxy)
+      so that any future events addressed to this object can be handled. *)
+
+  val attach : ('a, [`Unknown], 'role) proxy -> ('a, [> `V1], 'role) #t -> unit
+  (** Like [attach_proxy], but ignores the resulting proxy.
+      Useful if the object only needs to respond to messages from the peer,
+      but otherwise doesn't do anything. *)
 
   val interface : (_, _, _) #t -> string
   (** [interface t] is the interface from [t]'s metadata. *)
@@ -99,6 +125,8 @@ module Service_handler : sig
       Using this incorrectly may lead to a protocol error (such as receiving an event for which
       no handler was registered). *)
 
+  (** {2 Functions for use by generated code} *)
+
   val accept_new :
     (_, 'v, [< `Client | `Server ] as 'role) proxy -> int32 ->
     (module Metadata.S with type t = 'a) ->
@@ -106,19 +134,15 @@ module Service_handler : sig
     ('a, [`Unknown], 'role) proxy
   (** [accept_new parent id metadata ~version] registers a new object,
       with an ID allocated by the peer.
-      The returned proxy must have its handlers attached before switching threads,
-      since otherwise processing a message addressed to the new object will fail.
-      This is called from the generated code; the user code then calls the result. *)
 
-  val attach_proxy : ('a, [`Unknown], 'role) proxy -> ('a, ([> `V1] as 'v), 'role) #t -> ('a, 'v, 'role) proxy
-  (** [attach_proxy p t] sets [t] as the handler for [p],
-      which must be a partly initialised proxy returned by [accept_new].
-      It returns the proxy with its version cast to the handler's version. *)
-
-  val attach : ('a, [`Unknown], 'role) proxy -> ('a, [> `V1], 'role) #t -> unit
-  (** Like [attach_proxy], but ignores the resulting proxy.
-      Useful if the object only needs to respond to messages from the peer. *)
+      The generated bindings call this when receiving a new object,
+      before passsing the resulting half-initialised proxy to the application code. *)
 end
+
+(** {2 Functions for use by generated code}
+
+    You should not need to use these functions directly.
+    Instead, run wayland-scanner-ocaml to generate typed wrappers and use the wrappers instead. *)
 
 val id : _ t -> int32
 (** [id t] is [t]'s object ID. Use this to refer to the object in a message.
@@ -174,6 +198,9 @@ val pp_transport : _ t Fmt.t
 (** [pp_transport] calls {!S.transport#pp} on the proxy's transport. *)
 
 (**/**)
+
+type ('v, 'role) generic = Proxy : ('a, 'v, 'role) t -> ('v, 'role) generic
+(** A proxy whose type isn't known statically. Use {!ty} and pattern matching to recover the type. *)
 
 val add_root : 'role Internal.connection -> ('a, 'v, 'role) #Handler.t -> ('a, 'v, 'role) t
 (** [add_root conn h] sets [h] as the handler for object 1. *)

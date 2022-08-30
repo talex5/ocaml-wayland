@@ -19,6 +19,9 @@ end
 module Server = Server
 (** Code for writing Wayland servers. *)
 
+module Proxy = Proxy
+(** A proxy corresponds to an object on the connection. *)
+
 module Fixed = Fixed
 (** Wayland's 24.8 fixed-point type. *)
 
@@ -37,9 +40,6 @@ module Wayland_proto = Wayland_proto
 (** Type metadata for use by bindings. *)
 
 (** {2 Low-level API} *)
-
-module Proxy = Proxy
-(** Low-level operations on objects, mostly used by the generated wrappers. *)
 
 module Metadata = Metadata
 (** Describing interfaces. *)
