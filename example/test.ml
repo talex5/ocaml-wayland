@@ -138,6 +138,7 @@ let () =
         method on_close _ =
           Fmt.pr "Window closed - exiting!@.";
           Lwt.wakeup set_closed ()
+        method on_wm_capabilities _ ~capabilities:_ = ()
       end
     in
     Xdg_toplevel.set_title toplevel ~title:"ocaml-wayland";
