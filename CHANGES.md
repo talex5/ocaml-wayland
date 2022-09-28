@@ -1,3 +1,16 @@
+# v1.1
+
+- Add update.sh script and update protocols (@MisterDA #25, @talex5 #33).
+
+- Improve proxy module documentation (@talex5 #31).
+
+- Improve "No such object" error (@talex5 #28).
+
+- Make `Handler.cast_version` more general (@talex5 #27).  
+  Avoids the need to cast to `Handler.t` before using `cast_version`.
+
+- Update to cmdliner.1.1.1 (@MisterDA #26).
+
 # v1.0
 
 - Improve connection shutdown (#22).
