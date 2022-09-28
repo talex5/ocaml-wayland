@@ -87,6 +87,7 @@ module S = struct
       method on_set_buffer_transform = failwith "Not implemented"
       method on_set_buffer_scale = failwith "Not implemented"
       method on_damage_buffer = failwith "Not implemented"
+      method on_offset = failwith "Not implemented"
     end
 
   let make_compositor t proxy =

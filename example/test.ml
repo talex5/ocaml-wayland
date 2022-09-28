@@ -118,6 +118,7 @@ let () =
         method on_axis_discrete _ ~axis:_ ~discrete:_ = ()
         method on_frame _ = ()
         method on_axis_stop _ ~time:_ ~axis:_ = ()
+        method on_axis_value120 _ ~axis:_ ~value120:_ = ()
       end
     in
     let configured, set_configured = Lwt.wait () in
