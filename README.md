@@ -230,3 +230,11 @@ until the upstream service has confirmed the deletion too.
 [The Wayland Protocol]: https://wayland-book.com/
 [Cap'n Proto RPC]: https://github.com/mirage/capnp-rpc
 [API documentation]: https://talex5.github.io/ocaml-wayland/wayland/index.html
+
+## Adding or updating protocols
+
+Each protocol is generated from an xml file vendored under the `protocols` directory. There is
+an `update.sh` shell script which pulls down the latest version of all of the protocols when run.
+
+When adding a new protocol, add an entry in the `update.sh` and the `protocols/dune` file. The `--open`
+flag is a comma-separated list of the protocol modules which the new protocol is dependent on.
