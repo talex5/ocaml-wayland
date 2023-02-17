@@ -50,6 +50,8 @@
 	     summary="the client provided an invalid surface state"/>
       <entry name="invalid_positioner" value="5"
 	     summary="the client provided an invalid positioner"/>
+      <entry name="unresponsive" value="6"
+	     summary="the client didn’t respond to a ping event in time"/>
     </enum>
 
     <request name="destroy" type="destructor">
@@ -58,7 +60,7 @@
 
 	Destroying a bound xdg_wm_base object while there are surfaces
 	still alive created by this xdg_wm_base object instance is illegal
-	and will result in a protocol error.
+	and will result in a defunct_surfaces error.
       </description>
     </request>
 
@@ -77,7 +79,7 @@
 	itself is not a role, the corresponding surface may only be assigned
 	a role extending xdg_surface, such as xdg_toplevel or xdg_popup. It is
 	illegal to create an xdg_surface for a wl_surface which already has an
-	assigned role and this will result in a protocol error.
+	assigned role and this will result in a role error.
 
 	This creates an xdg_surface for the given surface. An xdg_surface is
 	used as basis to define a role to a given surface, such as xdg_toplevel
@@ -94,7 +96,8 @@
     <request name="pong">
       <description summary="respond to a ping event">
 	A client must respond to a ping event with a pong request or
-	the client may be deemed unresponsive. See xdg_wm_base.ping.
+	the client may be deemed unresponsive. See xdg_wm_base.ping
+	and xdg_wm_base.error.unresponsive.
       </description>
       <arg name="serial" type="uint" summary="serial of the ping event"/>
     </request>
@@ -108,7 +111,9 @@
 	Compositors can use this to determine if the client is still
 	alive. It's unspecified what will happen if the client doesn't
 	respond to the ping request, or in what timeframe. Clients should
-	try to respond in a reasonable amount of time.
+	try to respond in a reasonable amount of time. The “unresponsive”
+	error is provided for compositors that wish to disconnect unresponsive
+	clients.
 
 	A compositor is free to ping in any way it wants, but a client must
 	always respond to any xdg_wm_base object it created.
@@ -137,7 +142,7 @@
       For an xdg_positioner object to be considered complete, it must have a
       non-zero size set by set_size, and a non-zero anchor rectangle set by
       set_anchor_rect. Passing an incomplete xdg_positioner object when
-      positioning a surface raises an error.
+      positioning a surface raises an invalid_positioner error.
     </description>
 
     <enum name="error">
@@ -225,7 +230,8 @@
 	specified (e.g. 'bottom_right' or 'top_left'), then the child surface
 	will be placed towards the specified gravity; otherwise, the child
 	surface will be centered over the anchor point on any axis that had no
-	gravity specified.
+	gravity specified. If the gravity is not in the ‘gravity’ enum, an
+	invalid_input error is raised.
       </description>
       <arg name="gravity" type="uint" enum="gravity"
 	   summary="gravity direction"/>
@@ -451,15 +457,25 @@
     </description>
 
     <enum name="error">
-      <entry name="not_constructed" value="1"/>
-      <entry name="already_constructed" value="2"/>
-      <entry name="unconfigured_buffer" value="3"/>
+      <entry name="not_constructed" value="1"
+	     summary="Surface was not fully constructed"/>
+      <entry name="already_constructed" value="2"
+	     summary="Surface was already constructed"/>
+      <entry name="unconfigured_buffer" value="3"
+	     summary="Attaching a buffer to an unconfigured surface"/>
+      <entry name="invalid_serial" value="4"
+	     summary="Invalid serial number when acking a configure event"/>
+      <entry name="invalid_size" value="5"
+	     summary="Width or height was zero or negative"/>
+      <entry name="defunct_role_object" value="6"
+	     summary="Surface was destroyed before its role object"/>
     </enum>
 
     <request name="destroy" type="destructor">
       <description summary="destroy the xdg_surface">
 	Destroy the xdg_surface object. An xdg_surface must only be destroyed
-	after its role object has been destroyed.
+	after its role object has been destroyed, otherwise
+	a defunct_role_object error is raised.
       </description>
     </request>
 
@@ -517,10 +533,10 @@
 	the wl_surface associated with this xdg_surface.
 
 	The width and height must be greater than zero. Setting an invalid size
-	will raise an error. When applied, the effective window geometry will be
-	the set window geometry clamped to the bounding rectangle of the
-	combined geometry of the surface of the xdg_surface and the associated
-	subsurfaces.
+	will raise an invalid_size error. When applied, the effective window
+	geometry will be the set window geometry clamped to the bounding
+	rectangle of the combined geometry of the surface of the xdg_surface and
+	the associated subsurfaces.
       </description>
       <arg name="x" type="int"/>
       <arg name="y" type="int"/>
@@ -541,6 +557,8 @@
 
 	If the client receives multiple configure events before it
 	can respond to one, it only has to ack the last configure event.
+	Acking a configure event that was never sent raises an invalid_serial
+	error.
 
 	A client is not required to commit immediately after sending
 	an ack_configure request - it may even ack_configure several times
@@ -549,6 +567,17 @@
 	A client may send multiple ack_configure requests before committing, but
 	only the last request sent before a commit indicates which configure
 	event the client really is responding to.
+
+	Sending an ack_configure request consumes the serial number sent with
+	the request, as well as serial numbers sent by all configure events
+	sent on this xdg_surface prior to the configure event referenced by
+	the committed serial.
+
+	It is an error to issue multiple ack_configure requests referencing a
+	serial from the same configure event, or to issue an ack_configure
+	request referencing a serial from a configure event issued before the
+	event identified by the last ack_configure request for the same
+	xdg_surface. Doing so will raise an invalid_serial error.
       </description>
       <arg name="serial" type="uint" summary="the serial from the configure event"/>
     </request>
@@ -610,6 +639,8 @@
         not a valid variant of the resize_edge enum"/>
       <entry name="invalid_parent" value="1"
         summary="invalid parent toplevel"/>
+      <entry name="invalid_size" value="2"
+	summary="client provided an invalid min or max size"/>
     </enum>
 
     <request name="set_parent">
@@ -675,7 +706,7 @@
 	application identifiers and how they relate to well-known D-Bus
 	names and .desktop files.
 
-	[0] http://standards.freedesktop.org/desktop-entry-spec/
+	[0] https://standards.freedesktop.org/desktop-entry-spec/
       </description>
       <arg name="app_id" type="string"/>
     </request>
@@ -689,7 +720,8 @@
 	This request asks the compositor to pop up such a window menu at
 	the given position, relative to the local surface coordinates of
 	the parent surface. There are no guarantees as to what menu items
-	the window menu contains.
+	the window menu contains, or even if a window menu will be drawn
+	at all.
 
 	This request must be used in response to some sort of user action
 	like a button press, key press, or touch down event.
@@ -878,11 +910,11 @@
 	request.
 
 	Requesting a maximum size to be smaller than the minimum size of
-	a surface is illegal and will result in a protocol error.
+	a surface is illegal and will result in an invalid_size error.
 
 	The width and height must be greater than or equal to zero. Using
-	strictly negative values for width and height will result in a
-	protocol error.
+	strictly negative values for width or height will result in a
+	invalid_size error.
       </description>
       <arg name="width" type="int"/>
       <arg name="height" type="int"/>
@@ -919,11 +951,11 @@
 	request.
 
 	Requesting a minimum size to be larger than the maximum size of
-	a surface is illegal and will result in a protocol error.
+	a surface is illegal and will result in an invalid_size error.
 
 	The width and height must be greater than or equal to zero. Using
 	strictly negative values for width and height will result in a
-	protocol error.
+	invalid_size error.
       </description>
       <arg name="width" type="int"/>
       <arg name="height" type="int"/>
