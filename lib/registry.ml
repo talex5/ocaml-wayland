@@ -1,4 +1,3 @@
-open Lwt.Syntax
 open Wayland_client
 
 type entry = {
@@ -33,8 +32,8 @@ let of_display d =
       method on_global_remove _ = remove db
     end
   in
-  let* () = Client.sync d in
-  Lwt.return { db; registry }
+  Client.sync d;
+  { db; registry }
 
 let get t = Hashtbl.find_all t.db
 

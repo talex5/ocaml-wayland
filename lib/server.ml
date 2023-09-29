@@ -41,12 +41,12 @@ module Trace : TRACE = struct
 end
 
 
-let connect ?(trace=(module Trace : TRACE)) transport handler =
+let connect ?(trace=(module Trace : TRACE)) ~sw transport handler =
   Lazy.force init_logging;
-  let conn, wl_display = Connection.connect ~trace `Server transport handler in
+  let conn, wl_display = Connection.connect ~sw ~trace `Server transport handler in
   { conn; wl_display }
 
 let wl_display t = t.wl_display
 
-let closed t = Connection.closed t.conn
 let dump f t = Connection.dump f t.conn
+let stop t = Connection.stop t.conn

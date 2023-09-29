@@ -62,7 +62,7 @@ val add_fixed      : (_, [`W]) t -> Fixed.t -> unit
 
 (**/**)
 
-val buffer : (_, [`W]) t -> Lwt_bytes.t
+val buffer : (_, [`W]) t -> Cstruct.buffer
 val fds : (_, [`W]) t -> Unix.file_descr Queue.t
 
 val cast : ('a, 'rw) t -> ('b, 'rw) t

@@ -1,6 +1,6 @@
 (library
   (public_name wayland)
-  (libraries lwt lwt.unix logs cstruct fmt))
+  (libraries eio eio.unix logs cstruct fmt))
 
 (rule
  (targets wayland_client.ml wayland_server.ml wayland_proto.ml)

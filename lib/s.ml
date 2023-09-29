@@ -1,16 +1,18 @@
+open Eio.Std
+
 (** A transport is used to send and receive bytes and file descriptors.
     Typically this will just call the usual Unix [sendmsg] and [recvmsg] functions,
     but other transports are possible. *)
 class type transport = object
-  method send : Cstruct.t -> Unix.file_descr list -> unit Lwt.t
+  method send : Cstruct.t -> Eio_unix.Fd.t list -> unit
   (** [send data fds] transmits the bytes of [data] and the file descriptors in [fds]. *)
 
-  method recv : Cstruct.t -> (int * Unix.file_descr list) Lwt.t
+  method recv : sw:Switch.t -> Cstruct.t -> int * Eio_unix.Fd.t list
   (** [recv buffer] reads incoming data from the remote peer.
       The data is read into [buffer] and the method returns the number of bytes
       read and the list of attached file descriptors. *)
 
-  method shutdown : unit Lwt.t
+  method shutdown : unit
   (** Shut down the sending side of the connection. This will cause the peer to read end-of-file. *)
 
   method up : bool

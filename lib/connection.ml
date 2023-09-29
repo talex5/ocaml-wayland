@@ -1,13 +1,12 @@
-open Lwt.Syntax
+open Eio.Std
 open Internal
 
 type 'a t = 'a Internal.connection
 
 (* Dispatch all complete messages in [recv_buffer]. *)
 let rec process_recv_buffer t recv_buffer =
-  let* () = t.paused in
   match Msg.parse ~fds:t.incoming_fds (Recv_buffer.data recv_buffer) with
-  | None -> Lwt.return_unit
+  | None -> ()
   | Some msg ->
     begin
       let obj = Msg.obj msg in
@@ -33,39 +32,24 @@ let rec process_recv_buffer t recv_buffer =
     process_recv_buffer t recv_buffer
 
 let listen t =
+  Switch.run @@ fun sw ->
   let recv_buffer = Recv_buffer.create 4096 in
   let rec aux () =
-    let* (got, fds) = t.transport#recv (Recv_buffer.free_buffer recv_buffer) in
-    if Lwt.is_sleeping t.closed then (
-      List.iter (fun fd -> Queue.add fd t.incoming_fds) fds;
-      if got = 0 then (
-        Log.info (fun f -> f "Got end-of-file on wayland connection");
-        Lwt.return_unit
-      ) else (
-        Recv_buffer.update_producer recv_buffer got;
-        Log.debug (fun f -> f "Ring after adding %d bytes: %a" got Recv_buffer.dump recv_buffer);
-        let* () = process_recv_buffer t recv_buffer in
-        aux ()
-      )
+    let (got, fds) = t.transport#recv ~sw (Recv_buffer.free_buffer recv_buffer) in
+    List.iter (fun fd -> Queue.add (Eio_unix.Fd.remove fd |> Option.get) t.incoming_fds) fds;
+    if got = 0 then (
+      Log.info (fun f -> f "Got end-of-file on wayland connection");
+      t.transport#shutdown
     ) else (
-      List.iter Unix.close fds;
-      failwith "Connection is closed"
+      Recv_buffer.update_producer recv_buffer got;
+      Log.debug (fun f -> f "Ring after adding %d bytes: %a" got Recv_buffer.dump recv_buffer);
+      process_recv_buffer t recv_buffer;
+      aux ()
     )
   in
-  Lwt.try_bind aux
-    (fun () ->
-       if Lwt.is_sleeping t.closed then Lwt.wakeup t.set_closed (Ok ());
-       Queue.iter Unix.close t.incoming_fds;
-       Lwt.return_unit;
-    )
-    (fun ex ->
-       if Lwt.is_sleeping t.closed then
-         Lwt.wakeup t.set_closed (Error ex)
-       else
-         Log.debug (fun f -> f "Listen error (but connection already closed): %a" Fmt.exn ex);
-       Queue.iter Unix.close t.incoming_fds;
-       Lwt.return_unit;
-    )
+  try aux ()
+  with Eio.Io _ as ex when not t.transport#up ->
+    Log.warn (fun f -> f "Listen error (but connection already closed): %a" Fmt.exn ex)
 
 let clean_up t =
   t.objects |> Objects.iter (fun _ (Generic obj) ->
@@ -77,44 +61,32 @@ let clean_up t =
                          Fmt.exn ex)
         );
       Queue.clear obj.on_delete
-    );
-  Lwt.return_unit
+    )
 
-let connect ~trace role transport handler =
-  let closed, set_closed = Lwt.wait () in
+let connect ~sw ~trace role transport handler =
+  let incoming_fds = Queue.create () in
+  Switch.on_release sw (fun () -> Queue.iter Unix.close incoming_fds);
   let t = {
+    sw;
     transport = (transport :> S.transport);
-    paused = Lwt.return_unit;
     unpause = ignore;
     role;
     objects = Objects.empty;
     free_ids = [];
     next_id = (match role with `Client -> 2l | `Server -> 0xff000000l);
-    incoming_fds = Queue.create ();
+    incoming_fds;
     outbox = Queue.create ();
-    closed;
-    set_closed;
     trace = Proxy.trace trace;
   } in
   let display_proxy = Proxy.add_root t (handler :> _ Proxy.Handler.t) in
-  Lwt.async (fun () ->
-      Lwt.finalize
-        (fun () -> listen t)
-        (fun () -> clean_up t)
+  Eio.Fiber.fork ~sw (fun () ->
+      Fun.protect (fun () -> listen t)
+        ~finally:(fun () -> clean_up t)
     );
   (t, display_proxy)
 
-let closed t = t.closed
-
-let set_paused t = function
-  | false ->
-    if Lwt.is_sleeping t.paused then t.unpause ()
-  | true ->
-    if not (Lwt.is_sleeping t.paused) then (
-      let paused, set_paused = Lwt.wait () in
-      t.paused <- paused;
-      t.unpause <- Lwt.wakeup set_paused
-    )
+let stop t =
+  t.transport#shutdown
 
 let dump f t =
   let pp_item f (_id, Generic proxy) = pp_proxy f proxy in
