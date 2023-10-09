@@ -74,6 +74,8 @@ let main ~net =
       inherit [_] Wl_surface.v1
       method on_enter _ ~output:_ = ()
       method on_leave _ ~output:_ = ()
+      method on_preferred_buffer_scale _ ~factor:_ = ()
+      method on_preferred_buffer_transform _ ~transform:_ = ()
     end
   in
   let seat = Registry.bind reg @@ object
@@ -111,6 +113,7 @@ let main ~net =
       method on_frame _ = ()
       method on_axis_stop _ ~time:_ ~axis:_ = ()
       method on_axis_value120 _ ~axis:_ ~value120:_ = ()
+      method on_axis_relative_direction _ ~axis:_ ~direction:_ = ()
     end
   in
   let configured, set_configured = Promise.create () in
