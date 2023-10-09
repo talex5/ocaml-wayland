@@ -1,33 +1,33 @@
 <!DOCTYPE html>
-<html xmlns="http://www.w3.org/1999/xhtml"><head><title>v1 (wayland.Wayland_protocols.Drm_server.Wl_drm.v1)</title><link rel="stylesheet" href="../../../../../odoc.css"/><meta charset="utf-8"/><meta name="generator" content="odoc 2.1.1"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/><script src="../../../../../highlight.pack.js"></script><script>hljs.initHighlightingOnLoad();</script></head><body class="odoc"><nav class="odoc-nav"><a href="../index.html">Up</a> – <a href="../../../../index.html">wayland</a> &#x00BB; <a href="../../../index.html">Wayland_protocols</a> &#x00BB; <a href="../../index.html">Drm_server</a> &#x00BB; <a href="../index.html">Wl_drm</a> &#x00BB; v1</nav><header class="odoc-preamble"><h1>Class <code><span>Wl_drm.v1</span></code></h1><p>Handler for a proxy with version &gt;= 1.</p></header><div class="odoc-content"><div class="odoc-spec"><div><code><span> <span class="keyword">constraint</span> <span class="type-var">'a</span> = <span>[&lt; `V1 <span>| `V2</span> ]</span></span></code></div></div><div class="odoc-spec"><div class="spec method" id="method-on_authenticate" class="anchored"><a href="#method-on_authenticate" class="anchor"></a><code><span><span class="keyword">method</span> <span class="keyword">private</span> <span class="keyword">virtual</span> on_authenticate : <span><span><span>[&gt; `V1 <span>| `V2</span> ]</span> <a href="../index.html#type-t">t</a></span> <span class="arrow">&#45;&gt;</span></span> <span>id:int32 <span class="arrow">&#45;&gt;</span></span> unit</span></code></div></div><div class="odoc-spec"><div class="spec method" id="method-on_create_buffer" class="anchored"><a href="#method-on_create_buffer" class="anchor"></a><code><span><span class="keyword">method</span> <span class="keyword">private</span> <span class="keyword">virtual</span> on_create_buffer : <span><span><span>[&gt; `V1 <span>| `V2</span> ]</span> <a href="../index.html#type-t">t</a></span> <span class="arrow">&#45;&gt;</span></span>
-  <span><span><span>( <span>[ `Wl_buffer ]</span>, <span class="type-var">'b</span>, <span>[ `Server ]</span> )</span> <a href="../../../../Wayland/Proxy/index.html#type-t">Wayland.Proxy.t</a></span> <span class="arrow">&#45;&gt;</span></span>
-  <span>name:int32 <span class="arrow">&#45;&gt;</span></span>
-  <span>width:int32 <span class="arrow">&#45;&gt;</span></span>
-  <span>height:int32 <span class="arrow">&#45;&gt;</span></span>
-  <span>stride:int32 <span class="arrow">&#45;&gt;</span></span>
-  <span>format:int32 <span class="arrow">&#45;&gt;</span></span>
-  unit</span></code></div></div><div class="odoc-spec"><div class="spec method" id="method-on_create_planar_buffer" class="anchored"><a href="#method-on_create_planar_buffer" class="anchor"></a><code><span><span class="keyword">method</span> <span class="keyword">private</span> <span class="keyword">virtual</span> on_create_planar_buffer : <span><span><span>[&gt; `V1 <span>| `V2</span> ]</span> <a href="../index.html#type-t">t</a></span> <span class="arrow">&#45;&gt;</span></span>
-  <span><span><span>( <span>[ `Wl_buffer ]</span>, <span class="type-var">'b</span>, <span>[ `Server ]</span> )</span> <a href="../../../../Wayland/Proxy/index.html#type-t">Wayland.Proxy.t</a></span> <span class="arrow">&#45;&gt;</span></span>
-  <span>name:int32 <span class="arrow">&#45;&gt;</span></span>
-  <span>width:int32 <span class="arrow">&#45;&gt;</span></span>
-  <span>height:int32 <span class="arrow">&#45;&gt;</span></span>
-  <span>format:int32 <span class="arrow">&#45;&gt;</span></span>
-  <span>offset0:int32 <span class="arrow">&#45;&gt;</span></span>
-  <span>stride0:int32 <span class="arrow">&#45;&gt;</span></span>
-  <span>offset1:int32 <span class="arrow">&#45;&gt;</span></span>
-  <span>stride1:int32 <span class="arrow">&#45;&gt;</span></span>
-  <span>offset2:int32 <span class="arrow">&#45;&gt;</span></span>
-  <span>stride2:int32 <span class="arrow">&#45;&gt;</span></span>
-  unit</span></code></div></div><div class="odoc-spec"><div class="spec method" id="method-on_create_prime_buffer" class="anchored"><a href="#method-on_create_prime_buffer" class="anchor"></a><code><span><span class="keyword">method</span> <span class="keyword">private</span> <span class="keyword">virtual</span> on_create_prime_buffer : <span><span><span>[&gt; `V2 ]</span> <a href="../index.html#type-t">t</a></span> <span class="arrow">&#45;&gt;</span></span>
-  <span><span><span>( <span>[ `Wl_buffer ]</span>, <span class="type-var">'b</span>, <span>[ `Server ]</span> )</span> <a href="../../../../Wayland/Proxy/index.html#type-t">Wayland.Proxy.t</a></span> <span class="arrow">&#45;&gt;</span></span>
-  <span>name:<span class="xref-unresolved">Unix</span>.file_descr <span class="arrow">&#45;&gt;</span></span>
-  <span>width:int32 <span class="arrow">&#45;&gt;</span></span>
-  <span>height:int32 <span class="arrow">&#45;&gt;</span></span>
-  <span>format:int32 <span class="arrow">&#45;&gt;</span></span>
-  <span>offset0:int32 <span class="arrow">&#45;&gt;</span></span>
-  <span>stride0:int32 <span class="arrow">&#45;&gt;</span></span>
-  <span>offset1:int32 <span class="arrow">&#45;&gt;</span></span>
-  <span>stride1:int32 <span class="arrow">&#45;&gt;</span></span>
-  <span>offset2:int32 <span class="arrow">&#45;&gt;</span></span>
-  <span>stride2:int32 <span class="arrow">&#45;&gt;</span></span>
-  unit</span></code></div></div><div class="odoc-spec"><div class="spec method" id="method-min_version" class="anchored"><a href="#method-min_version" class="anchor"></a><code><span><span class="keyword">method</span> min_version : <span><span><span class="type-var">'a</span> <a href="#">v1</a></span> <span class="arrow">&#45;&gt;</span></span> int32</span></code></div></div><div class="odoc-spec"><div class="spec method" id="method-bind_version" class="anchored"><a href="#method-bind_version" class="anchor"></a><code><span><span class="keyword">method</span> bind_version : <span><span class="type-var">'c</span> <span class="arrow">&#45;&gt;</span></span> <span>[ `V1 ]</span></span></code></div></div></div></body></html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><title>v1 (wayland.Wayland_protocols.Drm_server.Wl_drm.v1)</title><link rel="stylesheet" href="../../../../../odoc.support/odoc.css"/><meta charset="utf-8"/><meta name="generator" content="odoc v2.3.0"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/><script src="../../../../../odoc.support/highlight.pack.js"></script><script>hljs.initHighlightingOnLoad();</script></head><body class="odoc"><nav class="odoc-nav"><a href="../index.html">Up</a> – <a href="../../../../index.html">wayland</a> &#x00BB; <a href="../../../index.html">Wayland_protocols</a> &#x00BB; <a href="../../index.html">Drm_server</a> &#x00BB; <a href="../index.html">Wl_drm</a> &#x00BB; v1</nav><header class="odoc-preamble"><h1>Class <code><span>Wl_drm.v1</span></code></h1><p>Handler for a proxy with version &gt;= 1.</p></header><div class="odoc-content"><div class="odoc-spec"><div class="spec"><code><span> <span class="keyword">constraint</span> <span class="type-var">'a</span> = <span>[&lt; `V1 <span>| `V2</span> ]</span></span></code></div></div><div class="odoc-spec"><div class="spec method anchored" id="method-on_authenticate"><a href="#method-on_authenticate" class="anchor"></a><code><span><span class="keyword">method</span> <span class="keyword">private</span> <span class="keyword">virtual</span> on_authenticate : <span><span><span>[&gt; `V1 <span>| `V2</span> ]</span> <a href="../index.html#type-t">t</a></span> <span class="arrow">&#45;&gt;</span></span> <span><span class="label">id</span>:int32 <span class="arrow">&#45;&gt;</span></span> unit</span></code></div></div><div class="odoc-spec"><div class="spec method anchored" id="method-on_create_buffer"><a href="#method-on_create_buffer" class="anchor"></a><code><span><span class="keyword">method</span> <span class="keyword">private</span> <span class="keyword">virtual</span> on_create_buffer : <span><span><span>[&gt; `V1 <span>| `V2</span> ]</span> <a href="../index.html#type-t">t</a></span> <span class="arrow">&#45;&gt;</span></span>
+  <span><span><span>(<span>[ `Wl_buffer ]</span>, <span class="type-var">'b</span>, <span>[ `Server ]</span>)</span> <span class="xref-unresolved">{Proxy}2</span>.t</span> <span class="arrow">&#45;&gt;</span></span>
+  <span><span class="label">name</span>:int32 <span class="arrow">&#45;&gt;</span></span>
+  <span><span class="label">width</span>:int32 <span class="arrow">&#45;&gt;</span></span>
+  <span><span class="label">height</span>:int32 <span class="arrow">&#45;&gt;</span></span>
+  <span><span class="label">stride</span>:int32 <span class="arrow">&#45;&gt;</span></span>
+  <span><span class="label">format</span>:int32 <span class="arrow">&#45;&gt;</span></span>
+  unit</span></code></div></div><div class="odoc-spec"><div class="spec method anchored" id="method-on_create_planar_buffer"><a href="#method-on_create_planar_buffer" class="anchor"></a><code><span><span class="keyword">method</span> <span class="keyword">private</span> <span class="keyword">virtual</span> on_create_planar_buffer : <span><span><span>[&gt; `V1 <span>| `V2</span> ]</span> <a href="../index.html#type-t">t</a></span> <span class="arrow">&#45;&gt;</span></span>
+  <span><span><span>(<span>[ `Wl_buffer ]</span>, <span class="type-var">'b</span>, <span>[ `Server ]</span>)</span> <span class="xref-unresolved">{Proxy}2</span>.t</span> <span class="arrow">&#45;&gt;</span></span>
+  <span><span class="label">name</span>:int32 <span class="arrow">&#45;&gt;</span></span>
+  <span><span class="label">width</span>:int32 <span class="arrow">&#45;&gt;</span></span>
+  <span><span class="label">height</span>:int32 <span class="arrow">&#45;&gt;</span></span>
+  <span><span class="label">format</span>:int32 <span class="arrow">&#45;&gt;</span></span>
+  <span><span class="label">offset0</span>:int32 <span class="arrow">&#45;&gt;</span></span>
+  <span><span class="label">stride0</span>:int32 <span class="arrow">&#45;&gt;</span></span>
+  <span><span class="label">offset1</span>:int32 <span class="arrow">&#45;&gt;</span></span>
+  <span><span class="label">stride1</span>:int32 <span class="arrow">&#45;&gt;</span></span>
+  <span><span class="label">offset2</span>:int32 <span class="arrow">&#45;&gt;</span></span>
+  <span><span class="label">stride2</span>:int32 <span class="arrow">&#45;&gt;</span></span>
+  unit</span></code></div></div><div class="odoc-spec"><div class="spec method anchored" id="method-on_create_prime_buffer"><a href="#method-on_create_prime_buffer" class="anchor"></a><code><span><span class="keyword">method</span> <span class="keyword">private</span> <span class="keyword">virtual</span> on_create_prime_buffer : <span><span><span>[&gt; `V2 ]</span> <a href="../index.html#type-t">t</a></span> <span class="arrow">&#45;&gt;</span></span>
+  <span><span><span>(<span>[ `Wl_buffer ]</span>, <span class="type-var">'b</span>, <span>[ `Server ]</span>)</span> <span class="xref-unresolved">{Proxy}2</span>.t</span> <span class="arrow">&#45;&gt;</span></span>
+  <span><span class="label">name</span>:<span class="xref-unresolved">Unix</span>.file_descr <span class="arrow">&#45;&gt;</span></span>
+  <span><span class="label">width</span>:int32 <span class="arrow">&#45;&gt;</span></span>
+  <span><span class="label">height</span>:int32 <span class="arrow">&#45;&gt;</span></span>
+  <span><span class="label">format</span>:int32 <span class="arrow">&#45;&gt;</span></span>
+  <span><span class="label">offset0</span>:int32 <span class="arrow">&#45;&gt;</span></span>
+  <span><span class="label">stride0</span>:int32 <span class="arrow">&#45;&gt;</span></span>
+  <span><span class="label">offset1</span>:int32 <span class="arrow">&#45;&gt;</span></span>
+  <span><span class="label">stride1</span>:int32 <span class="arrow">&#45;&gt;</span></span>
+  <span><span class="label">offset2</span>:int32 <span class="arrow">&#45;&gt;</span></span>
+  <span><span class="label">stride2</span>:int32 <span class="arrow">&#45;&gt;</span></span>
+  unit</span></code></div></div><div class="odoc-spec"><div class="spec method anchored" id="method-min_version"><a href="#method-min_version" class="anchor"></a><code><span><span class="keyword">method</span> min_version : int32</span></code></div></div><div class="odoc-spec"><div class="spec method anchored" id="method-bind_version"><a href="#method-bind_version" class="anchor"></a><code><span><span class="keyword">method</span> bind_version : <span>[ `V1 ]</span></span></code></div></div></div></body></html>
