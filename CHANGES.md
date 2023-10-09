@@ -1,3 +1,15 @@
+# v2.0
+
+- Convert from Lwt to Eio (@talex5 #37).  
+  Remove `set_paused`, as it's no longer needed.
+
+- Add `Client.stop` and `Server.stop` (@talex5 #37).  
+  These allow shutting down the connection without reporting an error.
+
+- Update to latest versions of Wayland protocols (@talex5 #38).
+
+- Add layer shell protocol (@yilinwei #36).
+
 # v1.1
 
 - Add update.sh script and update protocols (@MisterDA #25, @talex5 #33).
