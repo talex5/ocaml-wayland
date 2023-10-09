@@ -149,6 +149,8 @@ let test_simple () =
       inherit [_] Wl_surface.v1
       method on_enter _ ~output:_ = ()
       method on_leave _ ~output:_ = ()
+      method on_preferred_buffer_scale _ ~factor:_ = ()
+      method on_preferred_buffer_transform _ ~transform:_ = ()
     end
   in
   let region = Wl_compositor.create_region comp @@ new Wl_region.v1 in

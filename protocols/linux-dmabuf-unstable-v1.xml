@@ -86,6 +86,11 @@
       For all DRM formats and unless specified in another protocol extension,
       pre-multiplied alpha is used for pixel values.
 
+      Unless specified otherwise in another protocol extension, implicit
+      synchronization is used. In other words, compositors and clients must
+      wait and signal fences implicitly passed via the DMA-BUF's reservation
+      mechanism.
+
       Warning! The protocol described in this file is experimental and
       backward incompatible changes may be made. Backward compatible changes
       may be added together with the corresponding interface version bump.
@@ -344,7 +349,7 @@
         successful. It provides the new wl_buffer referencing the dmabuf(s).
 
         Upon receiving this event, the client should destroy the
-        zlinux_dmabuf_params object.
+        zwp_linux_buffer_params_v1 object.
       </description>
       <arg name="buffer" type="new_id" interface="wl_buffer"
            summary="the newly created wl_buffer"/>
@@ -357,7 +362,7 @@
         has not been fulfilled.
 
         Upon receiving this event, the client should destroy the
-        zlinux_buffer_params object.
+        zwp_linux_buffer_params_v1 object.
       </description>
     </event>
 
