@@ -35,6 +35,14 @@
   (deps relative-pointer-unstable-v1.xml)
   (action (run %{bin:wayland-scanner-ocaml} --open Wayland.Wayland_proto %{deps})))
 
+
+(rule
+  (targets pointer_constraints_unstable_v1_client.ml
+           pointer_constraints_unstable_v1_server.ml
+           pointer_constraints_unstable_v1_proto.ml)
+  (deps pointer-constraints-unstable-v1.xml)
+  (action (run %{bin:wayland-scanner-ocaml} --open Wayland.Wayland_proto %{deps})))
+
 (rule
  (targets server_decoration_client.ml
           server_decoration_server.ml
