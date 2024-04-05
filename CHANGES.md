@@ -1,3 +1,11 @@
+# v2.1
+
+- Add relative-pointer-v1 (@Mic92 #40).
+
+- Add pointer-constraints-unstable-v1 (@Mic92 #41).
+
+- Update protocols to latest versions (@talex5 #43).
+
 # v2.0
 
 - Convert from Lwt to Eio (@talex5 #37).  
