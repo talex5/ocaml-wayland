@@ -344,7 +344,7 @@
 
 	The default adjustment is none.
       </description>
-      <arg name="constraint_adjustment" type="uint"
+      <arg name="constraint_adjustment" type="uint" enum="constraint_adjustment"
 	   summary="bit mask of constraint adjustments"/>
     </request>
 
@@ -625,6 +625,10 @@
       id, and well as trigger user interactive operations such as interactive
       resize and move.
 
+      A xdg_toplevel by default is responsible for providing the full intended
+      visual representation of the toplevel, which depending on the window
+      state, may mean things like a title bar, window controls and drop shadow.
+
       Unmapping an xdg_toplevel means that the surface cannot be shown
       by the compositor until it is explicitly mapped again.
       All active operations (e.g., move, resize) are canceled and all
@@ -869,24 +873,36 @@
 	<description summary="the surface’s left edge is tiled">
 	  The window is currently in a tiled layout and the left edge is
 	  considered to be adjacent to another part of the tiling grid.
+
+	  The client should draw without shadow or other decoration outside of
+	  the window geometry on the left edge.
 	</description>
       </entry>
       <entry name="tiled_right" value="6" since="2">
 	<description summary="the surface’s right edge is tiled">
 	  The window is currently in a tiled layout and the right edge is
 	  considered to be adjacent to another part of the tiling grid.
+
+	  The client should draw without shadow or other decoration outside of
+	  the window geometry on the right edge.
 	</description>
       </entry>
       <entry name="tiled_top" value="7" since="2">
 	<description summary="the surface’s top edge is tiled">
 	  The window is currently in a tiled layout and the top edge is
 	  considered to be adjacent to another part of the tiling grid.
+
+	  The client should draw without shadow or other decoration outside of
+	  the window geometry on the top edge.
 	</description>
       </entry>
       <entry name="tiled_bottom" value="8" since="2">
 	<description summary="the surface’s bottom edge is tiled">
 	  The window is currently in a tiled layout and the bottom edge is
 	  considered to be adjacent to another part of the tiling grid.
+
+	  The client should draw without shadow or other decoration outside of
+	  the window geometry on the bottom edge.
 	</description>
       </entry>
       <entry name="suspended" value="9" since="6">

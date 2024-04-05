@@ -212,7 +212,7 @@
     </request>
   </interface>
 
-  <interface name="wl_shm_pool" version="1">
+  <interface name="wl_shm_pool" version="2">
     <description summary="a shared memory pool">
       The wl_shm_pool object encapsulates a piece of memory shared
       between the compositor and client.  Through the wl_shm_pool
@@ -272,7 +272,7 @@
     </request>
   </interface>
 
-  <interface name="wl_shm" version="1">
+  <interface name="wl_shm" version="2">
     <description summary="shared memory support">
       A singleton global object that provides support for shared
       memory.
@@ -457,6 +457,17 @@
       </description>
       <arg name="format" type="uint" enum="format" summary="buffer pixel format"/>
     </event>
+
+    <!-- Version 2 additions -->
+
+    <request name="release" type="destructor" since="2">
+      <description summary="release the shm object">
+	Using this request a client can tell the server that it is not going to
+	use the shm object anymore.
+
+	Objects created via this interface remain unaffected.
+      </description>
+    </request>
   </interface>
 
   <interface name="wl_buffer" version="1">
@@ -468,8 +479,10 @@
       client provides and updates the contents is defined by the buffer factory
       interface.
 
-      If the buffer uses a format that has an alpha channel, the alpha channel
-      is assumed to be premultiplied in the electrical color channel values
+      Color channels are assumed to be electrical rather than optical (in other
+      words, encoded with a transfer function) unless otherwise specified. If
+      the buffer uses a format that has an alpha channel, the alpha channel is
+      assumed to be premultiplied into the electrical color channel values
       (after transfer function encoding) unless otherwise specified.
 
       Note, because wl_buffer objects are created from multiple independent
@@ -884,7 +897,7 @@
 	The icon surface is an optional (can be NULL) surface that
 	provides an icon to be moved around with the cursor.  Initially,
 	the top-left corner of the icon surface is placed at the cursor
-	hotspot, but subsequent wl_surface.attach request can move the
+	hotspot, but subsequent wl_surface.offset requests can move the
 	relative position. Attach requests must be confirmed with
 	wl_surface.commit as usual. The icon surface is given the role of
 	a drag-and-drop icon. If the icon surface already has another role,
@@ -1501,8 +1514,9 @@
 	mutates the underlying buffer storage, the surface contents become
 	undefined immediately.
 
-	If wl_surface.attach is sent with a NULL wl_buffer, the
-	following wl_surface.commit will remove the surface content.
+	If wl_surface.attach is sent with a NULL wl_buffer, or the pending
+	wl_buffer has been destroyed, the following wl_surface.commit will
+	remove the surface content.
       </description>
       <arg name="buffer" type="object" interface="wl_buffer" allow-null="true"
 	   summary="buffer of surface contents"/>
@@ -1749,11 +1763,11 @@
 	a buffer that is larger (by a factor of scale in each dimension)
 	than the desired surface size.
 
-	If scale is not positive the invalid_scale protocol error is
+	If scale is not greater than 0 the invalid_scale protocol error is
 	raised.
       </description>
       <arg name="scale" type="int"
-	   summary="positive scale for interpreting buffer contents"/>
+	   summary="scale for interpreting buffer contents"/>
     </request>
 
     <!-- Version 4 additions -->
@@ -1826,10 +1840,15 @@
 	This event indicates the preferred buffer scale for this surface. It is
 	sent whenever the compositor's preference changes.
 
+	Before receiving this event the preferred buffer scale for this surface
+	is 1.
+
 	It is intended that scaling aware clients use this event to scale their
 	content and use wl_surface.set_buffer_scale to indicate the scale they
 	have rendered with. This allows clients to supply a higher detail
 	buffer.
+
+	The compositor shall emit a scale value greater than 0.
       </description>
       <arg name="factor" type="int" summary="preferred scaling factor"/>
     </event>
@@ -1838,6 +1857,9 @@
       <description summary="preferred buffer transform for the surface">
 	This event indicates the preferred buffer transform for this surface.
 	It is sent whenever the compositor's preference changes.
+
+	Before receiving this event the preferred buffer transform for this
+	surface is normal.
 
 	It is intended that transform aware clients use this event to apply the
 	transform to their content and use wl_surface.set_buffer_transform to
@@ -2603,6 +2625,8 @@
 	currently active on this client's surface. The client is
 	responsible for finalizing the touch points, future touch points on
 	this surface may reuse the touch point ID.
+
+	No frame event is required after the cancel event.
       </description>
     </event>
 
@@ -2737,6 +2761,10 @@
 	The geometry event will be followed by a done event (starting from
 	version 2).
 
+	Clients should use wl_surface.preferred_buffer_transform instead of the
+	transform advertised by this event to find the preferred buffer
+	transform to use for a surface.
+
 	Note: wl_output only advertises partial information about the output
 	position and identification. Some compositors, for instance those not
 	implementing a desktop-style output layout or those exposing virtual
@@ -2832,8 +2860,9 @@
 	This event contains scaling geometry information
 	that is not in the geometry event. It may be sent after
 	binding the output object or if the output scale changes
-	later. If it is not sent, the client should assume a
-	scale of 1.
+	later. The compositor will emit a non-zero, positive
+	value for scale. If it is not sent, the client should
+	assume a scale of 1.
 
 	A scale larger than 1 means that the compositor will
 	automatically scale surface buffers by this amount
@@ -2841,12 +2870,9 @@
 	displays where applications rendering at the native
 	resolution would be too small to be legible.
 
-	It is intended that scaling aware clients track the
-	current output of a surface, and if it is on a scaled
-	output it should use wl_surface.set_buffer_scale with
-	the scale of the output. That way the compositor can
-	avoid scaling the surface, and the client can supply
-	a higher detail image.
+	Clients should use wl_surface.preferred_buffer_scale
+	instead of this event to find the preferred buffer
+	scale to use for a surface.
 
 	The scale event will be followed by a done event.
       </description>
@@ -3072,6 +3098,11 @@
 
       If the parent wl_surface object is destroyed, the sub-surface is
       unmapped.
+
+      A sub-surface never has the keyboard focus of any seat.
+
+      The wl_surface.offset request is ignored: clients must use set_position
+      instead to move the sub-surface.
     </description>
 
     <request name="destroy" type="destructor">
@@ -3097,9 +3128,7 @@
 	surface area. Negative values are allowed.
 
 	The scheduled coordinates will take effect whenever the state of the
-	parent surface is applied. When this happens depends on whether the
-	parent surface is in synchronized mode or not. See
-	wl_subsurface.set_sync and wl_subsurface.set_desync for details.
+	parent surface is applied.
 
 	If more than one set_position request is invoked by the client before
 	the commit of the parent surface, the position of a new request always
@@ -3122,9 +3151,7 @@
 	The z-order is double-buffered. Requests are handled in order and
 	applied immediately to a pending state. The final pending state is
 	copied to the active state the next time the state of the parent
-	surface is applied. When this happens depends on whether the parent
-	surface is in synchronized mode or not. See wl_subsurface.set_sync and
-	wl_subsurface.set_desync for details.
+	surface is applied.
 
 	A new sub-surface is initially added as the top-most in the stack
 	of its siblings and parent.
