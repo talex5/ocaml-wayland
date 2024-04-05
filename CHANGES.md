@@ -6,6 +6,8 @@
 
 - Update protocols to latest versions (@talex5 #43).
 
+- Cope with interfaces that are always v1 (@talex5 #44).
+
 # v2.0
 
 - Convert from Lwt to Eio (@talex5 #37).  
