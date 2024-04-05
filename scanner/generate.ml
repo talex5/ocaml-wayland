@@ -5,6 +5,12 @@ let module_name = String.capitalize_ascii
 let full_module_name (proto : Protocol.t) (iface : Interface.t) =
   Fmt.str "%s_proto.%s" (String.capitalize_ascii proto.name) (module_name iface.name)
 
+(* Normally the child has the same version as the parent. But some interfaces don't
+   follow this rule (wl_callback, wl_buffer, wl_region) and remain at v1. *)
+let is_v1 = function
+  | "wl_callback" | "wl_buffer" | "wl_region" -> true
+  | _ -> false
+
 let mangle name =
   let name =
     name |> String.map @@ function
@@ -60,6 +66,7 @@ let pp_type ~role ~next_tvar iface f (arg:Arg.t) =
       let t = !next_tvar in
       next_tvar := t + 1;
       Fmt.pf f "('x%d, [`Unknown], %a) Proxy.t" t pp_role role
+    | `New_ID (Some i) when is_v1 i -> Fmt.pf f "(%a, [`V1], %a) Proxy.t" pp_poly i pp_role role
     | `New_ID (Some i) -> Fmt.pf f "(%a, 'v, %a) Proxy.t" pp_poly i pp_role role
     | `Fixed -> Fmt.string f "Fixed.t"
     | `FD -> Fmt.string f "Unix.file_descr"
@@ -103,7 +110,8 @@ let pp_args ~role ~with_types =
       Fmt.pf f "(%s:(%a, _, %a) Proxy.t%s)" m pp_poly interface pp_role role
         (if arg.allow_null then " option" else "")
     | `New_ID (Some interface) when with_types ->
-      Fmt.pf f "(%s:(%a, 'v, %a) #Proxy.Handler.t)" m pp_poly interface pp_role role
+      let v = if is_v1 interface then "[`V1]" else "'v" in
+      Fmt.pf f "(%s:(%a, %s, %a) #Proxy.Handler.t)" m pp_poly interface v pp_role role
     | _ ->
       Fmt.pf f "%s" m
   in
@@ -329,7 +337,7 @@ let make_wrappers ~opens ~internal role (protocol : Protocol.t) f =
   line "";
   protocol.interfaces |> List.iter (fun (iface : Interface.t) ->
       let root = root_interface ~parents iface in
-      let n_versions = root.version in
+      let n_versions = min iface.version root.version in
       let is_service = root == iface in
       let versions = get_versions ~n_versions iface in
       line "";
@@ -358,10 +366,13 @@ let make_wrappers ~opens ~internal role (protocol : Protocol.t) f =
               line "@[<v2>let %s (_t:([< %a] as 'v) t) @[<h>%a@] ="
                 (mangle msg.name) pp_versions (msg.since, n_versions) (pp_args ~role ~with_types:true) msg.args;
               new_ids |> List.iter (fun (arg : Arg.t) ->
+                  let ty = match arg.ty with `New_ID x -> x | _ -> assert false in
+                  let v1 = match ty with Some i -> is_v1 i | None -> false in
                   let m = mangle arg.name in
-                  line "let __%s = Proxy.spawn%s _t %s in"
+                  line "let __%s = Proxy.spawn%s %s %s in"
                     m
-                    (match arg.ty with `New_ID None -> "_bind" | _ -> "")
+                    (match ty with None -> "_bind" | _ -> "")
+                    (if v1 then "(Proxy.cast_version _t)" else "_t")
                     m
                 );
               line "let _msg = Proxy.alloc _t ~op:%d ~ints:%d ~strings:[%a] ~arrays:[%a] in"
