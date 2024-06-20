@@ -20,6 +20,9 @@ let mangle name =
   match name with
   | "method"
   | "handlers"
+  | "type"
+  | "end"
+  | "begin"
   | "h"
   | "done" -> name ^ "_"
   | x -> x
