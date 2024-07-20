@@ -77,6 +77,7 @@ let connect ~sw ~trace role transport handler =
     incoming_fds;
     outbox = Queue.create ();
     trace = Proxy.trace trace;
+    display_proxy = None;
   } in
   let display_proxy = Proxy.add_root t (handler :> _ Proxy.Handler.t) in
   Eio.Fiber.fork ~sw (fun () ->

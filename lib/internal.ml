@@ -13,6 +13,7 @@ type 'role connection = {
   incoming_fds : Unix.file_descr Queue.t;
   outbox : (unit, [`W]) Msg.t Queue.t;          (* The transmit thread is running whenever this is non-empty. *)
   trace : 'role tracer;
+  mutable display_proxy : ([`Wl_display], [`V1], 'role) versioned_proxy option;
 } and ('a, 'role) proxy = {
   id : int32;
   conn : 'role connection;
