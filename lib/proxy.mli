@@ -1,6 +1,6 @@
 (** {2 Types} *)
 
-type ('a, +'v, 'role) t
+type ('a, +'v, 'role) t = ('a, 'v, 'role) Internal.versioned_proxy
 (** An [('a, 'v, 'role) t] is a proxy used by ['role] to send messages to an object with interface ['a] and version in ['v]. *)
 
 val user_data : ('a, _, 'role) t -> ('a, 'role) S.user_data

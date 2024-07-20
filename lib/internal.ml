@@ -31,7 +31,7 @@ and ('a, 'role) handler = <
 and 'role tracer = {
   outbound : 'a. ('a, 'role) proxy -> ('a, [`W]) Msg.t -> unit;
   inbound : 'a. ('a, 'role) proxy -> ('a, [`R]) Msg.t -> unit;
-}
+} and ('a, +'v, 'role) versioned_proxy = ('a, 'role) proxy
 
 let get_unused_id t =
   match t.free_ids with
