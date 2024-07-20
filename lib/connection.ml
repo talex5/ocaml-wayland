@@ -80,6 +80,7 @@ let connect ~sw ~trace role transport handler =
     display_proxy = None;
   } in
   let display_proxy = Proxy.add_root t (handler :> _ Proxy.Handler.t) in
+  t.display_proxy <- Some display_proxy;
   Eio.Fiber.fork ~sw (fun () ->
       Fun.protect (fun () -> listen t)
         ~finally:(fun () -> clean_up t)
