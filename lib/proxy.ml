@@ -1,6 +1,6 @@
 open Internal
 
-type ('a, 'v, 'role) t = ('a, 'role) Internal.proxy
+type ('a, 'v, 'role) t = ('a, 'v, 'role) versioned_proxy
 
 type ('a, 'v, 'role) proxy = ('a, 'v, 'role) t
 
