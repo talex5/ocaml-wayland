@@ -41,6 +41,8 @@ let rec process_recv_buffer t recv_buffer =
               true
             with
             | Proxy.Error { id; code; message } when is_server ->
+               Log.warn (fun f -> f "Protocol error handling incoming message for %a: code %d, message %s"
+                         pp_proxy proxy (Int32.to_int code) message);
                post_error t ~id ~code ~message;
                false
             | ex ->
