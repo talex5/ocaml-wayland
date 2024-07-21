@@ -116,6 +116,17 @@ let id t =
   if t.can_send then t.id
   else Fmt.invalid_arg "Attempt to use %a after destroying it" pp t
 
+exception Error of { id: int32; code: int32; message: string }
+(** Fatal error event.
+
+    Raised by servers to indicate a protocol error.
+
+    Clients should not raise this exception.  If they do, it will be treated as any other
+    uncaught exception. *)
+
+let post_error t ~code ~message =
+  raise (Error { id = id t; code = code; message = message })
+
 let id_opt = function
   | None -> 0l
   | Some t -> id t

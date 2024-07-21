@@ -216,3 +216,15 @@ val wrong_type : parent:_ t -> expected:string -> _ t -> 'a
 (** [wrong_type ~parent ~expected t] fails with an exception complaining that [t] should have type [expected]. *)
 
 val trace : (module TRACE with type role = 'role) -> 'role Internal.tracer
+
+val post_error : ('a, [>`V1], [<`Server]) t -> code:int32 -> message:string -> 'b
+(** [post_error t ~code ~message] raises a protocol error with code [code] and message [message].
+    It does not return. *)
+
+exception Error of { id: int32; code: int32; message: string }
+(** Fatal error event.
+
+    Raised by servers to indicate a protocol error.
+
+    Clients should not raise this exception.  If they do, it will be treated as any other
+    uncaught exception. *)
