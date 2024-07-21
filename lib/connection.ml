@@ -2,34 +2,70 @@ open Eio.Std
 open Internal
 
 type 'a t = 'a Internal.connection
+let post_error t ~(id: int32) ~(code: int32) ~(message: string) =
+  match t.role with
+  | `Client -> ()
+  | `Server -> (
+    let _msg = Msg.alloc ~obj:1l ~op:0 ~ints:3 ~strings:[(Some message)] ~arrays:[] in
+    Msg.add_int _msg id;
+    Msg.add_int _msg code;
+    Msg.add_string _msg message;
+    match t.display_proxy with
+    | None -> assert false
+    | Some proxy -> Proxy.send proxy _msg
+  )
 
-(* Dispatch all complete messages in [recv_buffer]. *)
+(** Dispatch all complete messages in [recv_buffer].
+    Return [true] if everything was okay and [false] to shut down the connection. *)
 let rec process_recv_buffer t recv_buffer =
   match Msg.parse ~fds:t.incoming_fds (Recv_buffer.data recv_buffer) with
-  | None -> ()
+  | None -> true
   | Some msg ->
-    begin
-      let obj = Msg.obj msg in
-      match Objects.find_opt obj t.objects with
-      | None -> Fmt.failwith "No such object %lu (op=%d)" obj (Msg.op msg);
-      | Some (Generic proxy) ->
-        let msg = Msg.cast msg in
-        t.trace.inbound proxy msg;
-        if proxy.can_recv then (
-          try
-            proxy.handler#dispatch proxy msg
-          with ex ->
-            let bt = Printexc.get_raw_backtrace () in
-            Log.err (fun f -> f "Uncaught exception handling incoming message for %a:@,%a"
-                        pp_proxy proxy Fmt.exn_backtrace (ex, bt))
-        ) else (
-          Fmt.failwith "Received message for %a, which was shut down!" pp_proxy proxy
-        )
-    end;
-    Recv_buffer.update_consumer recv_buffer (Msg.length msg);
-    (* Unix.sleepf 0.001; *)
-    (* Fmt.pr "Buffer after dispatch: %a@." Recv_buffer.dump recv_buffer; *)
-    process_recv_buffer t recv_buffer
+     let keep_going =
+       let is_server = match t.role with
+         | `Server -> true
+         | `Client -> false
+       in
+       let obj = Msg.obj msg in
+       match Objects.find_opt obj t.objects with
+       | None ->
+          let message = Format.asprintf "No such object %lu (op=%d)" obj (Msg.op msg) in
+          (if is_server then post_error t ~id:1l (* wl_display *) ~code:0l (* invalid_object *) ~message);
+          false
+       | Some (Generic proxy) ->
+          let msg = Msg.cast msg in
+          t.trace.inbound proxy msg;
+          if proxy.can_recv then (
+            try
+              proxy.handler#dispatch proxy msg;
+              true
+            with
+            | Proxy.Error { id; code; message } when is_server ->
+               post_error t ~id ~code ~message;
+               false
+            | ex ->
+               let bt = Printexc.get_raw_backtrace () in
+               Log.err (fun f -> f "Uncaught exception handling incoming message for %a:@,%a"
+                                   pp_proxy proxy Fmt.exn_backtrace (ex, bt));
+               if is_server then (
+                 match ex with
+                 | Out_of_memory | Stack_overflow ->
+                    post_error t ~id:0l ~code:2l ~message:"Out of memory";
+                    raise ex (* System is now in undefined state, exit! *)
+                 | _ -> post_error t ~id:0l ~code:3l ~message:"Uncaught OCaml exception"
+               );
+               false
+          ) else (
+            Fmt.failwith "Received message for %a, which was shut down!" pp_proxy proxy
+          )
+     in
+     Recv_buffer.update_consumer recv_buffer (Msg.length msg);
+     (* Unix.sleepf 0.001; *)
+     (* Fmt.pr "Buffer after dispatch: %a@." Recv_buffer.dump recv_buffer; *)
+     if keep_going then
+       process_recv_buffer t recv_buffer
+     else
+       false
 
 let listen t =
   Switch.run @@ fun sw ->
@@ -43,8 +79,12 @@ let listen t =
     ) else (
       Recv_buffer.update_producer recv_buffer got;
       Log.debug (fun f -> f "Ring after adding %d bytes: %a" got Recv_buffer.dump recv_buffer);
-      process_recv_buffer t recv_buffer;
-      aux ()
+      if process_recv_buffer t recv_buffer then
+        aux ()
+      else (
+        Log.err (fun f -> f "Connection closed unexpectedly");
+        t.transport#shutdown
+      )
     )
   in
   try aux ()

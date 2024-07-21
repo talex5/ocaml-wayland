@@ -2,6 +2,10 @@ open Eio.Std
 
 module Objects = Map.Make(Int32)
 
+type 'a role =
+  | Server : [`Server] role
+  | Client : [`Client] role
+
 type 'role connection = {
   sw : Switch.t;
   transport : S.transport;
