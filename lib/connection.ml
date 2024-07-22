@@ -2,18 +2,6 @@ open Eio.Std
 open Internal
 
 type 'a t = 'a Internal.connection
-let post_error t ~(id: int32) ~(code: int32) ~(message: string) =
-  match t.role with
-  | `Client -> ()
-  | `Server -> (
-    let _msg = Msg.alloc ~obj:1l ~op:0 ~ints:3 ~strings:[(Some message)] ~arrays:[] in
-    Msg.add_int _msg id;
-    Msg.add_int _msg code;
-    Msg.add_string _msg message;
-    match t.display_proxy with
-    | None -> assert false
-    | Some proxy -> Proxy.send proxy _msg
-  )
 
 (** Dispatch all complete messages in [recv_buffer].
     Return [true] if everything was okay and [false] to shut down the connection. *)
@@ -30,7 +18,7 @@ let rec process_recv_buffer t recv_buffer =
        match Objects.find_opt obj t.objects with
        | None ->
           let message = Format.asprintf "No such object %lu (op=%d)" obj (Msg.op msg) in
-          (if is_server then post_error t ~id:1l (* wl_display *) ~code:0l (* invalid_object *) ~message);
+          (if is_server then Internal.error t ~object_id:1l (* wl_display *) ~code:0l (* invalid_object *) ~message);
           false
        | Some (Generic proxy) ->
           let msg = Msg.cast msg in
@@ -40,10 +28,10 @@ let rec process_recv_buffer t recv_buffer =
               proxy.handler#dispatch proxy msg;
               true
             with
-            | Proxy.Error { id; code; message } when is_server ->
+            | Proxy.Error { object_id; code; message } when is_server ->
                Log.warn (fun f -> f "Protocol error handling incoming message for %a: code %d, message %s"
                          pp_proxy proxy (Int32.to_int code) message);
-               post_error t ~id ~code ~message;
+               Internal.error t ~object_id ~code ~message;
                false
             | ex ->
                let bt = Printexc.get_raw_backtrace () in
@@ -52,9 +40,9 @@ let rec process_recv_buffer t recv_buffer =
                if is_server then (
                  match ex with
                  | Out_of_memory | Stack_overflow ->
-                    post_error t ~id:0l ~code:2l ~message:"Out of memory";
+                    Internal.error t ~object_id:1l ~code:2l ~message:"Out of memory";
                     raise ex (* System is now in undefined state, exit! *)
-                 | _ -> post_error t ~id:0l ~code:3l ~message:"Uncaught OCaml exception"
+                 | _ -> Internal.error t ~object_id:1l ~code:3l ~message:"Uncaught OCaml exception"
                );
                false
           ) else (
@@ -69,6 +57,8 @@ let rec process_recv_buffer t recv_buffer =
      else
        false
 
+let stop = Internal.shutdown
+
 let listen t =
   Switch.run @@ fun sw ->
   let recv_buffer = Recv_buffer.create 4096 in
@@ -77,7 +67,7 @@ let listen t =
     List.iter (fun fd -> Queue.add (Eio_unix.Fd.remove fd |> Option.get) t.incoming_fds) fds;
     if got = 0 then (
       Log.info (fun f -> f "Got end-of-file on wayland connection");
-      t.transport#shutdown
+      stop t
     ) else (
       Recv_buffer.update_producer recv_buffer got;
       Log.debug (fun f -> f "Ring after adding %d bytes: %a" got Recv_buffer.dump recv_buffer);
@@ -85,7 +75,7 @@ let listen t =
         aux ()
       else (
         Log.err (fun f -> f "Connection closed unexpectedly");
-        t.transport#shutdown
+        stop t
       )
     )
   in
@@ -108,6 +98,7 @@ let clean_up t =
 let connect ~sw ~trace role transport handler =
   let incoming_fds = Queue.create () in
   Switch.on_release sw (fun () -> Queue.iter Unix.close incoming_fds);
+  let (promise, resolver) = Eio.Promise.create () in
   let t = {
     sw;
     transport = (transport :> S.transport);
@@ -120,6 +111,9 @@ let connect ~sw ~trace role transport handler =
     outbox = Queue.create ();
     trace = Proxy.trace trace;
     display_proxy = None;
+    error = No_error;
+    promise;
+    resolver;
   } in
   let display_proxy = Proxy.add_root t (handler :> _ Proxy.Handler.t) in
   t.display_proxy <- Some display_proxy;
@@ -129,8 +123,7 @@ let connect ~sw ~trace role transport handler =
     );
   (t, display_proxy)
 
-let stop t =
-  t.transport#shutdown
+let error (t: [`Server] t) = Internal.error t
 
 let dump f t =
   let pp_item f (_id, Generic proxy) = pp_proxy f proxy in
