@@ -116,7 +116,7 @@ let id t =
   if t.can_send then t.id
   else Fmt.invalid_arg "Attempt to use %a after destroying it" pp t
 
-exception Error of { id: int32; code: int32; message: string }
+exception Error of { object_id: int32; code: int32; message: string }
 (** Fatal error event.
 
     Raised by servers to indicate a protocol error.
@@ -125,7 +125,7 @@ exception Error of { id: int32; code: int32; message: string }
     uncaught exception. *)
 
 let post_error t ~code ~message =
-  raise (Error { id = id t; code = code; message = message })
+  raise (Error { object_id = id t; code = code; message = message })
 
 let id_opt = function
   | None -> 0l
@@ -133,7 +133,7 @@ let id_opt = function
 
 let alloc t = Msg.alloc ~obj:t.id
 
-let send (type a) (t:_ t) (msg : (a, [`W]) Msg.t) =
+let send (type a) (t: (_, _, [<`Client|`Server]) t) (msg : (a, [`W]) Msg.t) =
   t.conn.trace.outbound t msg;
   if t.can_send then
     enqueue t.conn (Msg.cast msg)
@@ -183,7 +183,7 @@ let add_root conn (handler : (_, _, _) #Handler.t) =
 let on_delete t fn =
   Queue.add fn t.on_delete
 
-let delete t =
+let delete (t: ('a, [< `Client | `Server]) Internal.proxy): unit =
   let conn = t.conn in
   match Objects.find_opt t.id conn.objects with
   | Some (Generic t') when Obj.repr t == Obj.repr t' ->
