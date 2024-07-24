@@ -358,14 +358,14 @@ let make_wrappers ~opens ~internal role (protocol : Protocol.t) f =
              | _ :: _ :: _ -> failwith "Multiple error enums"
         in
         if errors <> [] then (
-          line "module Errors = struct";
+          line "@[<v2>module Errors = struct";
           (* Posting errors *)
           let pp_post_error (error : Entry.t) =
-            line "@[<v2>let %s (proxy: 'v t) ~(message: string): 'a =" error.name;
-            line "@[<v2>Proxy.post_error proxy ~code:%dl ~message@]@]" (Int32.to_int error.value)
+            line "@[<v2>let %s (proxy:([<`%s], [>`V%u], [<`Server]) Proxy.t) ~(message:string): 'a =" error.name (module_name iface.name) error.since;
+            line "Proxy.post_error proxy ~code:%dl ~message@]" (Int32.to_int error.value)
           in
           List.iter pp_post_error errors;
-          line "end"
+          Fmt.pf f "@]@,end"
         )
       in
 
@@ -471,48 +471,47 @@ let make_wrappers ~opens ~internal role (protocol : Protocol.t) f =
           msg.args |> List.iteri (fun i (arg : Arg.t) ->
               let m = mangle arg.name in
               begin match arg.ty with
-                | `Int | `Uint when arg.enum <> None ->
-                  line "@[<v2>let %s = Msg.get_int _msg |> %a.of_int32 in@]" m (pp_enum_module iface) arg
-                | `New_ID None ->
-                  line "let (module M%d : Metadata.S) = Msg.get_string _msg |> Iface_reg.lookup in" i;
-                  line "@[<v2>let %s =" m;
-                  line "let version = Msg.get_int _msg in";
-                  line "let id = Msg.get_int _msg in";
-                  line "Proxy.Service_handler.accept_new _proxy id (module M%d) ~version@]@,in" i;
-                | `New_ID (Some i) ->
-                  line "@[<v2>let %s : (%a, _, _) Proxy.t =@ Msg.get_int _msg |> Proxy.Handler.accept_new _proxy (module Imports.%s) in@]"
-                    m pp_poly i
-                    (module_name i)
-                | `Object (Some i) when arg.allow_null ->
-                  line "@[<v2>let %s : (%a, _, _) Proxy.t option =" m pp_poly i;
-                  line "match Msg.get_int _msg with";
-                  line "| 0l -> None";
-                  line "@[<v2>| id ->";
-                  line "let Proxy.Proxy p = Proxy.lookup_other _proxy id in";
-                  line "match Proxy.ty p with";
-                  line "| Imports.%s.T -> Some p" (module_name i);
-                  line "| _ -> Proxy.wrong_type ~parent:_proxy ~expected:%S p@]" i;
-                  line "in@]"
-                | `Object (Some i) ->
-                  line "@[<v2>let %s : (%a, _, _) Proxy.t =" m pp_poly i;
-                  line "let Proxy.Proxy p = Msg.get_int _msg |> Proxy.lookup_other _proxy in";
-                  line "match Proxy.ty p with";
-                  line "| Imports.%s.T -> p" (module_name i);
-                  line "| _ -> Proxy.wrong_type ~parent:_proxy ~expected:%S p" i;
-                  line "in@]"
-                | _ ->
-                  line "@[<v2>let %s = Msg.get_%a%s _msg in@]" m pp_type_getter arg.ty
-                    (if arg.allow_null then "_opt" else "");
-              end;
+              | `Int | `Uint when arg.enum <> None ->
+                line "@[<v2>let %s = Msg.get_int _msg |> %a.of_int32 in@]" m (pp_enum_module iface) arg
+              | `New_ID None ->
+                line "let (module M%d : Metadata.S) = Msg.get_string _msg |> Iface_reg.lookup in" i;
+                line "@[<v2>let %s =" m;
+                line "let version = Msg.get_int _msg in";
+                line "let id = Msg.get_int _msg in";
+                line "Proxy.Service_handler.accept_new _proxy id (module M%d) ~version@]@,in" i;
+              | `New_ID (Some i) ->
+                line "@[<v2>let %s : (%a, _, _) Proxy.t =@ Msg.get_int _msg |> Proxy.Handler.accept_new _proxy (module Imports.%s) in@]"
+                  m pp_poly i
+                  (module_name i)
+              | `Object (Some i) when arg.allow_null ->
+                line "@[<v2>let %s : (%a, _, _) Proxy.t option =" m pp_poly i;
+                line "match Msg.get_int _msg with";
+                line "| 0l -> None";
+                line "@[<v2>| id ->";
+                line "let Proxy.Proxy p = Proxy.lookup_other _proxy id in";
+                line "match Proxy.ty p with";
+                line "| Imports.%s.T -> Some p" (module_name i);
+                line "| _ -> Proxy.wrong_type ~parent:_proxy ~expected:%S p@]" i;
+                line "in@]"
+              | `Object (Some i) ->
+                line "@[<v2>let %s : (%a, _, _) Proxy.t =" m pp_poly i;
+                line "let Proxy.Proxy p = Msg.get_int _msg |> Proxy.lookup_other _proxy in";
+                line "match Proxy.ty p with";
+                line "| Imports.%s.T -> p" (module_name i);
+                line "| _ -> Proxy.wrong_type ~parent:_proxy ~expected:%S p" i;
+                line "in@]"
+              | _ ->
+                line "@[<v2>let %s = Msg.get_%a%s _msg in@]" m pp_type_getter arg.ty
+                  (if arg.allow_null then "_opt" else "");
+              end
             );
           if msg.ty = `Destructor then
             line "Proxy.shutdown_recv _proxy;";
           line "_self#on_%s %s@[%a@]@]"
             msg.name
             (if msg.ty = `Normal || role = `Server then "_proxy " else "")
-            (pp_args ~role ~with_types:false) msg.args;
-        );
-      line "| _ -> assert false@]";
+            (pp_args ~role ~with_types:false) msg.args);
+      line "| number -> Proxy.invalid_method_number ~_proxy ~number@]";
       Fmt.pf f "@]@,end";
       line "(**/**)";
       line "";

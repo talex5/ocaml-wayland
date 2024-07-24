@@ -221,10 +221,5 @@ val post_error : ('a, [>`V1], [<`Server]) t -> code:int32 -> message:string -> '
 (** [post_error t ~code ~message] raises a protocol error with code [code] and message [message].
     It does not return. *)
 
-exception Error of { object_id: int32; code: int32; message: string }
-(** Fatal error event.
-
-    Raised by servers to indicate a protocol error.
-
-    Clients should not raise this exception.  If they do, it will be treated as any other
-    uncaught exception. *)
+val invalid_method_number : _proxy:(_, [>`V1], [<`Client|`Server]) t -> number:int -> 'a
+(** Raise an error indicating that an invalid method number is used in a request or event. *)

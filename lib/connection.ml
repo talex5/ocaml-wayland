@@ -16,10 +16,11 @@ let rec process_recv_buffer t recv_buffer =
        in
        let obj = Msg.obj msg in
        match Objects.find_opt obj t.objects with
-       | None ->
+       | None when is_server ->
           let message = Format.asprintf "No such object %lu (op=%d)" obj (Msg.op msg) in
-          (if is_server then Internal.error t ~object_id:1l (* wl_display *) ~code:0l (* invalid_object *) ~message);
+          Internal.error t ~object_id:1l (* wl_display *) ~code:0l (* invalid_object *) ~message;
           false
+       | None -> false
        | Some (Generic proxy) ->
           let msg = Msg.cast msg in
           t.trace.inbound proxy msg;
@@ -28,10 +29,10 @@ let rec process_recv_buffer t recv_buffer =
               proxy.handler#dispatch proxy msg;
               true
             with
-            | Proxy.Error { object_id; code; message } when is_server ->
+            | Msg.Error { object_id; code; message } ->
                Log.warn (fun f -> f "Protocol error handling incoming message for %a: code %d, message %s"
                          pp_proxy proxy (Int32.to_int code) message);
-               Internal.error t ~object_id ~code ~message;
+               if is_server then Internal.error t ~object_id ~code ~message;
                false
             | ex ->
                let bt = Printexc.get_raw_backtrace () in

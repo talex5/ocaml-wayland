@@ -1,11 +1,6 @@
-module type ENDIAN = (module type of Cstruct.BE)
+module NE = Cstruct.HE
 
-let ne =
-  if Sys.big_endian then (module Cstruct.BE : ENDIAN)
-  else (module Cstruct.LE : ENDIAN)
-
-(* Native endian *)
-module NE = (val ne)
+exception Error of { object_id: int32; code: int32; message: string }
 
 type 'rw generic = {
   buffer : Cstruct.t;
@@ -25,7 +20,11 @@ let op t =
     NE.get_uint16 t.buffer 4
   )
 
+let[@ocaml.inline never] invalid_method message =
+  raise (Error { object_id = 1l; code = 1l; message })
+
 let get_int t =
+  (if t.next > t.buffer.len - 4 then invalid_method "Message out of bounds");
   let x = NE.get_uint32 t.buffer t.next in
   t.next <- t.next + 4;
   x
@@ -34,18 +33,38 @@ let add_int t x =
   NE.set_uint32 t.buffer t.next x;
   t.next <- t.next + 4
 
+let[@ocaml.inline always] length_to_advance (read: Cstruct.uint32) (remaining:int): int =
+  (* Convert the uint32 to an int64. OCaml sign extends,
+     but we want zero extension, so mask the top bits off.
+     Otherwise a negative value could bypass the subsequent
+     checks. *)
+  let read = Int64.logand (Int64.of_int32 read) 0xFFFFFFFFL in
+  let sixtyfour_len = Int64.logand (Int64.add read 3L) (-4L) in
+  if sixtyfour_len > Int64.of_int remaining then
+    invalid_method "Message out of bounds"
+  else
+    Int64.to_int sixtyfour_len
+
+let raw_get_string t len remaining =
+  let to_advance = length_to_advance len remaining in
+  let next = t.next in
+  let len = Int32.to_int len - 1 in
+  if Cstruct.get t.buffer (next + len) <> '\000' then
+    invalid_method "String not NUL-terminated"
+  else (
+    t.next <- next + to_advance;
+    Cstruct.to_string t.buffer ~off:next ~len
+  )
+
 let get_string t =
-  let cs = Cstruct.shift t.buffer t.next in
-  let len_excl_term = (NE.get_uint32 cs 0 |> Int32.to_int) - 1 in
-  t.next <- t.next + 4 + ((len_excl_term + 4) land -4);
-  Cstruct.to_string cs ~off:4 ~len:len_excl_term
+  let len = get_int t in
+  if len = 0l then invalid_method "No string provided"
+  else raw_get_string t len (t.buffer.len - t.next)
 
 let get_string_opt t =
-  let cs = Cstruct.shift t.buffer t.next in
-  let len_excl_term = (NE.get_uint32 cs 0 |> Int32.to_int) - 1 in
-  t.next <- t.next + 4 + ((len_excl_term + 4) land -4);
-  if len_excl_term = -1 then None
-  else Some (Cstruct.to_string cs ~off:4 ~len:len_excl_term)
+  let len = get_int t in
+  if len = 0l then None
+  else Some(raw_get_string t len (t.buffer.len - t.next))
 
 let add_string t v =
   let len_excl_term = String.length v in
@@ -58,10 +77,12 @@ let add_string_opt t = function
   | Some v -> add_string t v
 
 let get_array t =
-  let cs = Cstruct.shift t.buffer t.next in
-  let len = NE.get_uint32 cs 0 |> Int32.to_int in
-  t.next <- t.next + 4 + ((len + 3) land -4);
-  Cstruct.to_string cs ~off:4 ~len
+  let len = get_int t in
+  let to_advance = length_to_advance len (t.buffer.len - t.next) in
+  let len = Int32.to_int len in
+  let res = Cstruct.to_string t.buffer ~off:t.next ~len in
+  t.next <- t.next + to_advance;
+  res
 
 let add_array t v =
   let len = String.length v in

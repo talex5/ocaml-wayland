@@ -14,6 +14,19 @@ end
 
 let pp = pp_proxy
 
+let[@ocaml.inline never] invalid_object message =
+  raise (Msg.Error { object_id = 1l; code = 0l; message })
+
+let[@ocaml.inline never] invalid_method_number ~_proxy ~(number:int) =
+  Stdlib.Format.asprintf "Object %lu: Invalid method ID %u" _proxy.id number |>
+    Msg.invalid_method
+
+let[@ocaml.inline never] server_allocated_id id =
+  Format.asprintf "ID %lu is server-allocated" id |> invalid_object
+
+let[@ocaml.inline never] object_already_exists id =
+  Format.asprintf "An object with ID 0x%lx already exists!" id |> invalid_object
+
 let missing_dispatch _ = failwith "no handler registered!"
 
 type (_, _) S.user_data += Missing_handler
@@ -33,11 +46,11 @@ let accept_new t ~version ~handler id =
   let conn = t.conn in
   let is_service_allocated_id = (Int32.unsigned_compare id 0xFF000000l >= 0) in
   begin match conn.role with
-    | `Client -> assert is_service_allocated_id
-    | `Server -> assert (not is_service_allocated_id)
+  | `Client -> assert is_service_allocated_id
+  | `Server when is_service_allocated_id -> server_allocated_id id
+  | `Server -> ()
   end;
-  if Objects.mem id conn.objects then
-    Fmt.failwith "An object with ID %lu already exists!" id;
+  (if Objects.mem id conn.objects then object_already_exists id);
   let t' = make_proxy id ~version ~conn ~handler in
   conn.objects <- Objects.add id (Generic t') conn.objects;
   t'
@@ -116,16 +129,8 @@ let id t =
   if t.can_send then t.id
   else Fmt.invalid_arg "Attempt to use %a after destroying it" pp t
 
-exception Error of { object_id: int32; code: int32; message: string }
-(** Fatal error event.
-
-    Raised by servers to indicate a protocol error.
-
-    Clients should not raise this exception.  If they do, it will be treated as any other
-    uncaught exception. *)
-
 let post_error t ~code ~message =
-  raise (Error { object_id = id t; code = code; message = message })
+  raise (Msg.Error { object_id = id t; code = code; message = message })
 
 let id_opt = function
   | None -> 0l
@@ -155,11 +160,12 @@ let spawn_bind (t : (_, _, 'role) t) ((handler : ('a, 'v, 'role) #Service_handle
   let max_version = handler#max_version in
   if version < min_version then
     Fmt.failwith "Can't ask for %s version %ld when handler requires version >= %ld"
-      (Handler.interface handler) version min_version;
-  if version > max_version then
+      (Handler.interface handler) version min_version
+  else if version > max_version then
     Fmt.failwith "Can't ask for %s version %ld when handler requires version <= %ld"
-      (Handler.interface handler) version max_version;
-  spawn_generic t ~version handler
+      (Handler.interface handler) version max_version
+  else
+    spawn_generic t ~version handler
 
 let user_data (t:_ t) = t.handler#user_data
 
@@ -228,8 +234,11 @@ let lookup_other (t : _ t) id =
     else
       Fmt.failwith "Message referred to object %a, which cannot receive further messages" pp p
 
-let wrong_type ~parent ~expected t =
-  Fmt.failwith "Object %a referenced object %a, which should be of type %S but isn't'" pp parent pp t expected
+let[@inline never] wrong_type ~parent ~expected t =
+  let message =
+    Format.asprintf "Object %a referenced object %a, which should be of type %S but isn't'"
+    pp parent pp t expected in
+  raise (Msg.Error { object_id = 1l; code = 1l; message })
 
 let trace (type r) (module T : TRACE with type role = r) = {
   inbound = T.inbound;
