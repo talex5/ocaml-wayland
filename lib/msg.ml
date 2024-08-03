@@ -53,7 +53,10 @@ let raw_get_string t len remaining =
     invalid_method "String not NUL-terminated"
   else (
     t.next <- next + to_advance;
-    Cstruct.to_string t.buffer ~off:next ~len
+    let s = Cstruct.to_string t.buffer ~off:next ~len in
+    if String.contains s '\000'
+    then invalid_method "String contains embedded NUL bytes"
+    else s
   )
 
 let get_string t =
@@ -67,6 +70,8 @@ let get_string_opt t =
   else Some(raw_get_string t len (t.buffer.len - t.next))
 
 let add_string t v =
+  (if String.contains v '\000' then
+    invalid_arg "Wayland strings cannot contain NUL bytes");
   let len_excl_term = String.length v in
   add_int t (Int32.of_int (len_excl_term + 1));
   Cstruct.blit_from_string v 0 t.buffer t.next len_excl_term;
