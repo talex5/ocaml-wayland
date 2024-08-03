@@ -45,6 +45,12 @@ val get_fd     : _ t -> Unix.file_descr
 val get_fixed  : _ t -> Fixed.t
 (** [get_fixed t] returns the next argument (which must be a fixed-point number) from [t] and advances the next-argument pointer. *)
 
+val check_end : _ t -> bool -> unit
+(** [finished t] checks that the message is finished.
+
+    On the receiving side, set the boolean argument to true, which raises a protocol error.
+    On the sending side, set the boolean argument to false, which raises [Invalid_argument]. *)
+
 (** {2 Generating messages} *)
 
 val alloc : obj:int32 -> op:int -> ints:int -> strings:string option list -> arrays:string list -> ('a, [`W]) t

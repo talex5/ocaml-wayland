@@ -381,12 +381,9 @@ let make_wrappers ~opens ~internal role (protocol : Protocol.t) f =
           (* Sending messages *)
           msgs_out |> List.iter (fun (i, (msg : Message.t)) ->
               let new_ids = List.filter (function { Arg.ty = `New_ID _; _} -> true | _ -> false) msg.args in
-              let extra_version_fields =
-                new_ids |> List.filter (fun (a : Arg.t) -> a.ty = `New_ID None) |> List.length
-              in
               line "";
               comment f msg.description;
-              line "@[<v2>let %s (_t:([< %a] as 'v) t) @[<h>%a@] ="
+              line "@[<v2>let %s (_t:([< %a] as 'v) t) @[<h>%a@] = ("
                 (mangle msg.name) pp_versions (msg.since, n_versions) (pp_args ~role ~with_types:true) msg.args;
               new_ids |> List.iter (fun (arg : Arg.t) ->
                   let ty = match arg.ty with `New_ID x -> x | _ -> assert false in
@@ -398,8 +395,13 @@ let make_wrappers ~opens ~internal role (protocol : Protocol.t) f =
                     (if v1 then "(Proxy.cast_version _t)" else "_t")
                     m
                 );
+              let ints = List.fold_left (fun acc (arg : Arg.t) ->
+                  match arg.ty with
+                  | `New_ID (Some _) | `Object _ | `Int | `Uint | `Fixed -> acc + 1
+                  | `New_ID None -> acc + 2
+                  | `FD | `String | `Array -> acc) 0 msg.args in
               line "let _msg = Proxy.alloc _t ~op:%d ~ints:%d ~strings:[%a] ~arrays:[%a] in"
-                i (List.length msg.args + extra_version_fields)
+                i ints
                 pp_strings msg.args
                 pp_arrays msg.args;
               msg.args |> List.iter (fun (arg : Arg.t) ->
@@ -424,14 +426,15 @@ let make_wrappers ~opens ~internal role (protocol : Protocol.t) f =
                       (if arg.allow_null then "_opt" else "")
                       m
                 );
+              line "Msg.check_end _msg false;";
               line "Proxy.send _t _msg";
               if msg.ty = `Destructor then
                 Fmt.pf f ";@,Proxy.shutdown_send _t";
-              if new_ids = [] then Fmt.pf f "@]"
+              if new_ids = [] then Fmt.pf f ")@]"
               else (
                 Fmt.pf f ";";
                 let arg_name f arg = Fmt.pf f "__%s" (mangle arg.Arg.name) in
-                line "%a@]"
+                line "(%a))@]"
                   Fmt.(list ~sep:comma arg_name) new_ids
               )
             );
@@ -492,19 +495,20 @@ let make_wrappers ~opens ~internal role (protocol : Protocol.t) f =
                 line "match Proxy.ty p with";
                 line "| Imports.%s.T -> Some p" (module_name i);
                 line "| _ -> Proxy.wrong_type ~parent:_proxy ~expected:%S p@]" i;
-                line "in@]"
+                Fmt.pf f "@]@,in"
               | `Object (Some i) ->
                 line "@[<v2>let %s : (%a, _, _) Proxy.t =" m pp_poly i;
                 line "let Proxy.Proxy p = Msg.get_int _msg |> Proxy.lookup_other _proxy in";
                 line "match Proxy.ty p with";
                 line "| Imports.%s.T -> p" (module_name i);
                 line "| _ -> Proxy.wrong_type ~parent:_proxy ~expected:%S p" i;
-                line "in@]"
+                Fmt.pf f "@]@,in"
               | _ ->
                 line "@[<v2>let %s = Msg.get_%a%s _msg in@]" m pp_type_getter arg.ty
                   (if arg.allow_null then "_opt" else "");
               end
             );
+          line "Msg.check_end _msg true;";
           if msg.ty = `Destructor then
             line "Proxy.shutdown_recv _proxy;";
           line "_self#on_%s %s@[%a@]@]"

@@ -22,6 +22,9 @@ let op t =
 
 let[@ocaml.inline never] invalid_method message =
   raise (Error { object_id = 1l; code = 1l; message })
+let[@ocaml.inline never] trailing_junk expected actual direction =
+  Format.asprintf "Bad message: expected length %d, actual length %d" expected actual |>
+  if direction then invalid_method else invalid_arg
 
 let get_int t =
   (if t.next > t.buffer.len - 4 then invalid_method "Message out of bounds");
@@ -106,6 +109,11 @@ let get_fixed t =
 
 let add_fixed t v =
   add_int t (Fixed.to_bits v)
+
+let check_end t direction =
+  let expected = Cstruct.length t.buffer
+  and actual = t.next
+  in if expected <> actual then trailing_junk expected actual direction
 
 let rec count_strings acc = function
   | [] -> acc
