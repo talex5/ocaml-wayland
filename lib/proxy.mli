@@ -223,3 +223,6 @@ val post_error : ('a, [>`V1], [<`Server]) t -> code:int32 -> message:string -> '
 
 val invalid_method_number : _proxy:(_, [>`V1], [<`Client|`Server]) t -> number:int -> 'a
 (** Raise an error indicating that an invalid method number is used in a request or event. *)
+
+val invalid_enum : _proxy:(_, [>`V1], [<`Server|`Client]) t -> value:int32 -> name:string -> 'a
+(** Raise an error indicating that an invalid enum value is used in a request. *)

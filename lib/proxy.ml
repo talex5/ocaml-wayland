@@ -21,6 +21,11 @@ let[@ocaml.inline never] invalid_method_number ~_proxy ~(number:int) =
   Stdlib.Format.asprintf "Object %lu: Invalid method ID %u" _proxy.id number |>
     Msg.invalid_method
 
+let invalid_enum ~(_proxy: (_, [>`V1], [<`Server|`Client]) t) ~(value:int32) ~(name:string): 'a =
+  let message = Format.asprintf "Invalid enum value %ld for enum %s in message to object %a with version %ld"
+                  value name pp_proxy _proxy (_proxy.version) in
+  raise (Msg.Error { object_id = 1l; code = 1l; message})
+
 let[@ocaml.inline never] server_allocated_id id =
   Format.asprintf "ID %lu is server-allocated" id |> invalid_object
 

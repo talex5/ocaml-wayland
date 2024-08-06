@@ -270,14 +270,40 @@ let pp_enum f (enum : Enum.t) =
   Fmt.pf f "@,@[<v2>module %s = struct" (module_name enum.name);
   if enum.bitfield then (
     Fmt.pf f "@,type t = int32";
-    enum.entries |> List.iter (fun (e : Entry.t) ->
+    let max_version = List.fold_left (fun (max_version: int) (e : Entry.t) ->
         Fmt.pf f "@,";
         comment f e.description;
-        Fmt.pf f "@,let %s = %ldl" (mangle e.name) e.value
-      );
+        Fmt.pf f "@,let %s = %ldl" (mangle e.name) e.value;
+        max (e.since) max_version) 1 enum.entries
+    in
     Fmt.pf f "@,";
     Fmt.pf f "@,let to_int32 = Fun.id";
-    Fmt.pf f "@,let of_int32 = Fun.id";
+    Fmt.pf f "@,@[<v2>let of_int32 ~_proxy ~value =";
+    assert (max_version > 0);
+
+    if max_version > 1 then (
+      Fmt.pf f "@,@[<v2>let mask =";
+      Fmt.pf f "@,match Proxy.version _proxy with"
+    );
+    let final_value: int32 = snd (
+      enum.entries |>
+      List.sort (fun (a: Entry.t) (b: Entry.t) -> compare a.since b.since) |>
+      List.fold_left (fun (previous_version, value) (e : Entry.t) ->
+        let version = e.since in
+        assert (version >= previous_version);
+        for i = previous_version to version - 1 do
+          Fmt.pf f "@,| %dl -> 0x%lxl" i (Int32.lognot value)
+        done;
+        (version, Int32.logor value e.value)) (1, 0l))
+    in
+    if max_version > 1 then (
+      if final_value > 0l then
+        Fmt.pf f "@,| _ -> 0x%lxl" (Int32.lognot final_value);
+      Fmt.pf f "@]@,in@,@[<v2>if 0l <> Int32.logand value mask"
+    ) else
+      Fmt.pf f "@,@[<v2>if 0l <> Int32.logand value 0x%lxl" (Int32.lognot final_value);
+    Fmt.pf f {| then@,Proxy.invalid_enum ~_proxy ~value ~name:"%s"@]@,|} enum.name;
+    Fmt.pf f "@[<v2>else@,value@]@]@]"
   ) else (
     Fmt.pf f "@,@[<v2>type t =";
     enum.entries |> List.iter (fun (e : Entry.t) ->
@@ -289,14 +315,16 @@ let pp_enum f (enum : Enum.t) =
         Fmt.pf f "@,| %a -> %ldl" pp_ctor e.name e.value
       );
     Fmt.pf f "@]";
-    Fmt.pf f "@,@,@[<v2>let of_int32 = function";
+    Fmt.pf f "@,@,@[<v2>let of_int32 ~_proxy ~value =";
+    Fmt.pf f "@,let version = Proxy.version _proxy in";
+    Fmt.pf f "@,match value with";
     enum.entries |> List.iter (fun (e : Entry.t) ->
-        Fmt.pf f "@,| %ldl -> %a" e.value pp_ctor e.name
+        Fmt.pf f "@,| %ldl when version >= %dl -> %a" e.value e.since pp_ctor e.name
       );
-    Fmt.pf f {|@,| x -> Fmt.failwith "Invalid %s enum value %%ld" x|} enum.name;
-    Fmt.pf f "@]"
+    Fmt.pf f {|@,| _ -> Proxy.invalid_enum ~_proxy ~value ~name:"%s"|} enum.name;
+    Fmt.pf f "@]@]"
   );
-  Fmt.pf f "@]@,end"
+  Fmt.pf f "@,end\n"
 
 let pp_enum_link (protocol : Protocol.t) (iface : Interface.t) f (enum : Enum.t) =
   Fmt.pf f "@,module %s = %s_proto.%s.%s"
@@ -478,7 +506,7 @@ let make_wrappers ~opens ~internal role (protocol : Protocol.t) f =
               let m = mangle arg.name in
               begin match arg.ty with
               | `Int | `Uint when arg.enum <> None ->
-                line "@[<v2>let %s = Msg.get_int _msg |> %a.of_int32 in@]" m (pp_enum_module iface) arg
+                line "@[<v2>let %s = %a.of_int32 ~_proxy ~value:(Msg.get_int _msg) in@]" m (pp_enum_module iface) arg
               | `New_ID None ->
                 line "let (module M%d : Metadata.S) = Msg.get_string _msg |> Iface_reg.lookup in" i;
                 line "@[<v2>let %s =" m;
@@ -571,7 +599,7 @@ let output ~opens ~internal (protocol : Protocol.t) =
           line "";
           line "@[<v2>let requests = %a@]@," (op_info "request") iface.requests;
           line "@[<v2>let events = %a@]@," (op_info "event") iface.events;
-          Fmt.pf f "@]@,end";
+          Fmt.pf f "@]@,end@,";
           line "let () = Iface_reg.register (module %s)@," (module_name iface.name);
         );
     );
