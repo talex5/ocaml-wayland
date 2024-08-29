@@ -72,13 +72,27 @@ let get_string_opt t =
   if len = 0l then None
   else Some(raw_get_string t len (t.buffer.len - t.next))
 
+
+(* libwayland cannot handle messages more than 4096 bytes, and 1.23
+   even goes into a loop on them. *)
+let max_msg_len = 4096
+(* 8 for header, 4 for length, 1 for ['\0']-terminator. *)
+let max_string_len = max_msg_len - 13
+(* 8 for header, 4 for length. *)
+let max_array_len = max_msg_len - 12
+
 let add_string t v =
-  (if String.contains v '\000' then
-    invalid_arg "Wayland strings cannot contain NUL bytes");
-  let len_excl_term = String.length v in
-  add_int t (Int32.of_int (len_excl_term + 1));
-  Cstruct.blit_from_string v 0 t.buffer t.next len_excl_term;
-  t.next <- t.next + ((len_excl_term + 4) land -4)
+  if String.length v > max_string_len then
+    invalid_arg "String is too long to fit in a Wayland message"
+  else if String.contains v '\000' then
+    invalid_arg "Wayland strings cannot contain NUL bytes"
+  else (
+    let len_excl_term = String.length v in
+    let len = len_excl_term + 1 in
+    add_int t (Int32.of_int len);
+    Cstruct.blit_from_string v 0 t.buffer t.next len_excl_term;
+    t.next <- t.next + ((len_excl_term + 4) land -4)
+  )
 
 let add_string_opt t = function
   | None -> add_int t Int32.zero
@@ -116,18 +130,27 @@ let check_end t direction =
   in if expected <> actual then trailing_junk expected actual direction
 
 let rec count_strings acc = function
+  | _ when acc > max_msg_len -> invalid_arg "Message length overflow"
   | [] -> acc
-  | None :: ss ->
-    count_strings (acc + 4) ss
+  | None :: ss -> count_strings (acc + 4) ss
   | Some s :: ss ->
-    let len = 4 + (String.length s + 4) land -4 in (* Note: includes ['\0'] terminator *)
-    count_strings (acc + len) ss
+    let bare_len = String.length s in
+    if bare_len > max_string_len then
+      invalid_arg "String too long to send"
+    else
+      let len = 4 + ((bare_len + 4) land -4) in (* Note: includes ['\0'] terminator *)
+      count_strings (acc + len) ss
 
 let rec count_arrays acc = function
+  | _ when acc > max_msg_len -> invalid_arg "Message length overflow"
   | [] -> acc
   | x :: xs ->
-    let len = 4 + (String.length x + 3) land -4 in
-    count_arrays (acc + len) xs
+    let bare_len = String.length x in
+    if bare_len > max_array_len then
+      invalid_arg "Array too long to send"
+    else
+      let len = 4 + (bare_len + 3) land -4 in
+      count_arrays (acc + len) xs
 
 let alloc ~obj ~op ~ints ~strings ~arrays =
   let len = count_arrays (count_strings (8 + ints * 4) strings) arrays in
