@@ -173,7 +173,8 @@ let alloc ~obj ~op ~ints ~strings ~arrays =
 let buffer t = t.buffer.buffer
 
 let parse ~fds cs =
-  if Cstruct.length cs >= 8 then (
+  let buffer_length = Cstruct.length cs in
+  if buffer_length >= 8 then (
     let len =
       if Sys.big_endian then (
         NE.get_uint16 cs 4
@@ -181,8 +182,11 @@ let parse ~fds cs =
         NE.get_uint16 cs 6
       )
     in
-    if Cstruct.length cs >= len then (
-      Some { buffer = Cstruct.sub cs 0 len; next = 8; fds }
+    if buffer_length >= len then (
+      let buffer = Cstruct.sub cs 0 len in
+      ( assert (Cstruct.length buffer = len)
+      ; Some { buffer; next = 8; fds }
+      )
     ) else (
       None
     )
