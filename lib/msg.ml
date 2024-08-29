@@ -57,9 +57,12 @@ let raw_get_string t len remaining =
   else (
     t.next <- next + to_advance;
     let s = Cstruct.to_string t.buffer ~off:next ~len in
-    if String.contains s '\000'
-    then invalid_method "String contains embedded NUL bytes"
-    else s
+    if String.contains s '\000' then
+      invalid_method "String contains embedded NUL bytes"
+    else if not (String.is_valid_utf_8 s) then
+      invalid_method "String is not valid UTF-8"
+    else
+      s
   )
 
 let get_string t =
@@ -86,6 +89,8 @@ let add_string t v =
     invalid_arg "String is too long to fit in a Wayland message"
   else if String.contains v '\000' then
     invalid_arg "Wayland strings cannot contain NUL bytes"
+  else if not (String.is_valid_utf_8 v) then
+    invalid_arg "Wayland strings must be valid UTF-8"
   else (
     let len_excl_term = String.length v in
     let len = len_excl_term + 1 in
