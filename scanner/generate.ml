@@ -11,7 +11,9 @@ let is_v1 = function
   | "wl_callback" | "wl_buffer" | "wl_region" -> true
   | _ -> false
 
-let mangle name =
+type direction = Inbound | Outbound
+
+let mangle_trusted name =
   let name =
     name |> String.map @@ function
     | '-' -> '_'
@@ -27,12 +29,24 @@ let mangle name =
   | "done" -> name ^ "_"
   | x -> x
 
+(** We do not explicitly mark object references as untrusted, as there
+    is usually nothing to sanitize. *)
+let ty_needs_sanitize : Schema.Arg.ty -> bool = function
+  | `New_ID _ | `Object _ -> false
+  | _ -> true
+
+let mangle ~(arg:Arg.t) ~role ~direction =
+  let prefix = match (role, direction) with
+    | (`Server, Inbound) when ty_needs_sanitize arg.ty -> "untrusted_"
+    | _ -> ""
+  in prefix ^ mangle_trusted arg.name
+
 let pp_role f = function
   | `Client -> Fmt.string f "[`Client]"
   | `Server -> Fmt.string f "[`Server]"
 
 let pp_poly f name =
-  Fmt.pf f "[`%s]" (String.capitalize_ascii (mangle name))
+  Fmt.pf f "[`%s]" (String.capitalize_ascii (mangle_trusted name))
 
 let pp_enum_module (iface : Interface.t) f (arg:Arg.t) =
   let enum =
@@ -94,20 +108,20 @@ let named_argument (arg : Arg.t) =
   | `Object _ -> arg.name <> "id"
   | _ -> true
 
-let pp_arg ~role ~next_tvar iface f arg =
+let pp_arg ~role ~(direction:direction) ~next_tvar iface f arg =
   if named_argument arg then
-    Fmt.pf f "%s:%a" (mangle arg.name) (pp_type ~role ~next_tvar iface) arg
+    Fmt.pf f "%s:%a" (mangle ~arg ~role ~direction) (pp_type ~role ~next_tvar iface) arg
   else
     pp_type ~role ~next_tvar iface f arg
 
-let pp_sig ~role ~next_tvar iface f = function
+let pp_sig ~role ~direction ~next_tvar iface f = function
   | [] -> Fmt.string f "unit"
-  | args -> Fmt.(list ~sep:(any " ->@ ") (pp_arg ~role ~next_tvar iface) ++ any " ->@ unit") f args
+  | args -> Fmt.(list ~sep:(any " ->@ ") (pp_arg ~role ~direction ~next_tvar iface) ++ any " ->@ unit") f args
 
-let pp_args ~role ~with_types =
+let pp_args ~role ~with_types ~direction =
   let pp_arg f arg =
     if named_argument arg then Fmt.string f "~";
-    let m = mangle arg.name in
+    let m = mangle ~role ~direction ~arg in
     match arg.ty with
     | `Object (Some interface) when with_types ->
       Fmt.pf f "(%s:(%a, _, %a) Proxy.t%s)" m pp_poly interface pp_role role
@@ -197,10 +211,10 @@ let pp_strings f args =
   args
   |> List.filter_map (fun (a : Arg.t) ->
       match a.ty with
-      | `New_ID None -> Some (Fmt.str "(Some (Proxy.Service_handler.interface (fst %s)))" (mangle a.name))
+      | `New_ID None -> Some (Fmt.str "(Some (Proxy.Service_handler.interface (fst %s)))" (mangle_trusted a.name))
       | `String ->
-        if a.allow_null then Some (mangle a.name)
-        else Some (Fmt.str "(Some %s)" (mangle a.name))
+        if a.allow_null then Some (mangle_trusted a.name)
+        else Some (Fmt.str "(Some %s)" (mangle_trusted a.name))
       | _ -> None
     )
   |> Fmt.(list ~sep:semi string) f
@@ -209,7 +223,7 @@ let pp_arrays f args =
   args
   |> List.filter_map (fun (a : Arg.t) ->
       match a.ty with
-      | `Array -> Some (mangle a.name)
+      | `Array -> Some (mangle_trusted a.name)
       | _ -> None
     )
   |> Fmt.(list ~sep:semi string) f
@@ -273,7 +287,7 @@ let pp_enum f (enum : Enum.t) =
     let max_version = List.fold_left (fun (max_version: int) (e : Entry.t) ->
         Fmt.pf f "@,";
         comment f e.description;
-        Fmt.pf f "@,let %s = %ldl" (mangle e.name) e.value;
+        Fmt.pf f "@,let %s = %ldl" (mangle_trusted e.name) e.value;
         max (e.since) max_version) 1 enum.entries
     in
     Fmt.pf f "@,";
@@ -333,15 +347,15 @@ let pp_enum_link (protocol : Protocol.t) (iface : Interface.t) f (enum : Enum.t)
     (module_name iface.name)
     (module_name enum.name)
 
-let pp_msg_handler_sig ~role ~iface ~pp_self f (msg : Message.t) =
+let pp_msg_handler_sig ~role ~iface ~pp_self ~direction f (msg : Message.t) =
   let next_tvar = ref 0 in
-  let _args = Fmt.str "@[%a@]" (pp_sig ~role ~next_tvar iface) msg.args in
+  let _args = Fmt.str "@[%a@]" (pp_sig ~role ~direction ~next_tvar iface) msg.args in
   let n_tvars = !next_tvar in
   next_tvar := 0;
   Fmt.pf f "@[@[%a@]%t %a@]@,"
     pp_tvars n_tvars
     (fun f -> if msg.ty = `Normal || role = `Server then (pp_self f; Fmt.string f " ->"))
-    (pp_sig ~role ~next_tvar iface) msg.args
+    (pp_sig ~role ~direction ~next_tvar iface) msg.args
 
 let make_wrappers ~opens ~internal role (protocol : Protocol.t) f =
   let parents = Parent.index protocol in
@@ -415,11 +429,12 @@ let make_wrappers ~opens ~internal role (protocol : Protocol.t) f =
               line "";
               comment f msg.description;
               line "@[<v2>let %s (_t:([< %a] as 'v) t) @[<h>%a@] = ("
-                (mangle msg.name) pp_versions (msg.since, n_versions) (pp_args ~role ~with_types:true) msg.args;
+                (mangle_trusted msg.name) pp_versions (msg.since, n_versions)
+                (pp_args ~role ~with_types:true ~direction:Outbound) msg.args;
               new_ids |> List.iter (fun (arg : Arg.t) ->
                   let ty = match arg.ty with `New_ID x -> x | _ -> assert false in
                   let v1 = match ty with Some i -> is_v1 i | None -> false in
-                  let m = mangle arg.name in
+                  let m = mangle_trusted arg.name in
                   line "let __%s = Proxy.spawn%s %s %s in"
                     m
                     (match ty with None -> "_bind" | _ -> "")
@@ -436,7 +451,7 @@ let make_wrappers ~opens ~internal role (protocol : Protocol.t) f =
                 pp_strings msg.args
                 pp_arrays msg.args;
               msg.args |> List.iter (fun (arg : Arg.t) ->
-                  let m = mangle arg.name in
+                  let m = mangle_trusted arg.name in
                   match arg.ty with
                   | `New_ID None ->
                     line "Msg.add_string _msg (Proxy.Service_handler.interface (fst %s));" m;
@@ -464,7 +479,7 @@ let make_wrappers ~opens ~internal role (protocol : Protocol.t) f =
               if new_ids = [] then Fmt.pf f ")@]"
               else (
                 Fmt.pf f ";";
-                let arg_name f arg = Fmt.pf f "__%s" (mangle arg.Arg.name) in
+                let arg_name f arg = Fmt.pf f "__%s" (mangle_trusted arg.Arg.name) in
                 line "(%a))@]"
                   Fmt.(list ~sep:comma arg_name) new_ids
               )
@@ -494,7 +509,7 @@ let make_wrappers ~opens ~internal role (protocol : Protocol.t) f =
       line "";
       msgs_in |> List.iter (fun (msg : Message.t) ->
           let pp_self f = Fmt.string f "[> ] t" in
-          line "method private virtual on_%s : %a" msg.name (pp_msg_handler_sig ~role ~iface ~pp_self) msg;
+          line "method private virtual on_%s : %a" msg.name (pp_msg_handler_sig ~role ~direction:Inbound ~iface ~pp_self) msg;
         );
       line "";
       line "@[<v2>method dispatch (_proxy : 'v t) _msg =";
@@ -503,7 +518,7 @@ let make_wrappers ~opens ~internal role (protocol : Protocol.t) f =
       msgs_in |> List.iteri (fun i (msg : Message.t) ->
           line "@[<v2>| %d ->" i;
           msg.args |> List.iteri (fun i (arg : Arg.t) ->
-              let m = mangle arg.name in
+              let m = mangle ~role ~direction:Inbound ~arg in
               begin match arg.ty with
               | `Int | `Uint when arg.enum <> None ->
                 line "@[<v2>let %s = %a.of_int32 ~_proxy ~value:(Msg.get_int _msg) in@]" m (pp_enum_module iface) arg
@@ -513,10 +528,9 @@ let make_wrappers ~opens ~internal role (protocol : Protocol.t) f =
                 line "let version = Msg.get_int _msg in";
                 line "let id = Msg.get_int _msg in";
                 line "Proxy.Service_handler.accept_new _proxy id (module M%d) ~version@]@,in" i;
-              | `New_ID (Some i) ->
-                line "@[<v2>let %s : (%a, _, _) Proxy.t =@ Msg.get_int _msg |> Proxy.Handler.accept_new _proxy (module Imports.%s) in@]"
-                  m pp_poly i
-                  (module_name i)
+              | `New_ID (Some i) -> (
+                line "@[<v2>let %s : (%a, _, _) Proxy.t =@ Msg.get_int _msg |>@ \
+Proxy.Handler.accept_new _proxy (module Imports.%s) in@]" m pp_poly i (module_name i))
               | `Object (Some i) when arg.allow_null ->
                 line "@[<v2>let %s : (%a, _, _) Proxy.t option =" m pp_poly i;
                 line "match Msg.get_int _msg with";
@@ -545,7 +559,7 @@ let make_wrappers ~opens ~internal role (protocol : Protocol.t) f =
           line "_self#on_%s %s@[%a@]@]"
             msg.name
             (if msg.ty = `Normal || role = `Server then "_proxy " else "")
-            (pp_args ~role ~with_types:false) msg.args);
+            (pp_args ~role ~with_types:false ~direction:Inbound) msg.args);
       line "| number -> Proxy.invalid_method_number ~_proxy ~number@]";
       Fmt.pf f "@]@,end";
       line "(**/**)";
@@ -565,7 +579,7 @@ let make_wrappers ~opens ~internal role (protocol : Protocol.t) f =
             let pp_self f =
               Fmt.pf f "[> %a] t" pp_versions (max v msg.since, n_versions)
             in
-            line "method private virtual on_%s : %a" msg.name (pp_msg_handler_sig ~role ~iface ~pp_self) msg;
+            line "method private virtual on_%s : %a" msg.name (pp_msg_handler_sig ~role ~direction:Inbound ~iface ~pp_self) msg;
             comment f msg.description;
             Fmt.cut f ()
           );
@@ -578,7 +592,7 @@ let make_wrappers ~opens ~internal role (protocol : Protocol.t) f =
     )
 
 let output ~opens ~internal (protocol : Protocol.t) =
-  let file_base = mangle protocol.name in
+  let file_base = mangle_trusted protocol.name in
   with_output (file_base ^ "_proto.ml") (fun f ->
       let line fmt = Fmt.pf f ("@," ^^ fmt) in
       if not internal then (

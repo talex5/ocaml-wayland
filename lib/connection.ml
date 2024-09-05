@@ -4,6 +4,7 @@ open Internal
 type 'a t = 'a connection
 let invalid_object t message = error t ~object_id:1l ~code:0l ~message [@@inline never]
 let invalid_message t message = error t ~object_id:1l ~code:1l ~message [@@inline never]
+let bad_implementation t message = error t ~object_id:1l ~code:3l ~message [@@inline never]
 let[@inline never] bad_msg_len t len op is_server =
   let error = Format.asprintf "Invalid message length %u (op=%d)" len op in
   if is_server then (
@@ -52,7 +53,7 @@ let process_msg is_server msg t =
              Internal.error t ~object_id:1l ~code:2l ~message:"Out of memory"));
           raise ex (* System is now in undefined state, exit! *))
         | _ ->
-          Internal.error t ~object_id:1l ~code:3l ~message:"Uncaught OCaml exception";
+          bad_implementation t "Uncaught OCaml exception";
           raise ex
         end
     ) else if is_server then (

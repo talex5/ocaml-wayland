@@ -20,6 +20,8 @@ let op t =
     NE.get_uint16 t.buffer 4
   )
 
+let[@ocaml.inline never] bad_implementation message =
+  raise (Error { object_id = 1l; code = 3l; message })
 let[@ocaml.inline never] invalid_method message =
   raise (Error { object_id = 1l; code = 1l; message })
 let[@ocaml.inline never] trailing_junk expected actual direction =

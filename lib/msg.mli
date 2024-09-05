@@ -86,3 +86,19 @@ exception Error of { object_id: int32; code: int32; message: string }
 
 val invalid_method : string -> 'a
 (** Raise an error indicating that a message is invalid *)
+
+val bad_implementation : string -> 'a
+(** Raise an error indicating that there is a bug in the compositor,
+    but the bug is not so severe that the compositor must exit.
+    The client that made the request currently being handled will
+    be disconnected with a [Wayland_proto.Wl_display.Error.Implementation] error
+    including the provided message.
+
+    Other uses for this function include:
+
+    - A protocol requires an error to be raised, but does not provide
+      a suitable error.  This indicates a bug in the protocol specification.
+
+    - The client's request is valid, but the compositor is unable to honor it.
+      For instance, a compositor might use this error to indicate that a client
+      exceeded an arbitrary limit. *)
