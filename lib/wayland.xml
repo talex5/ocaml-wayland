@@ -242,7 +242,7 @@
       <arg name="width" type="int" summary="buffer width, in pixels"/>
       <arg name="height" type="int" summary="buffer height, in pixels"/>
       <arg name="stride" type="int" summary="number of bytes from the beginning of one row to the beginning of the next row"/>
-      <arg name="format" type="uint" enum="wl_shm.format" summary="buffer pixel format"/>
+      <arg name="format" type="uint" summary="buffer pixel format"/>
     </request>
 
     <request name="destroy" type="destructor">
