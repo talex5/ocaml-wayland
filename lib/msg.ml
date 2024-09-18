@@ -28,17 +28,19 @@ let[@ocaml.inline never] trailing_junk expected actual direction =
   Format.asprintf "Bad message: expected length %d, actual length %d" expected actual |>
   if direction then invalid_method else invalid_arg
 
+
+let hdr_len = 8
+let max_msg_len = 4096
+let max_array_len = max_msg_len - hdr_len - 4
+let max_string_len = max_array_len - 1
+
 let get_int t =
   (if t.next > t.buffer.len - 4 then invalid_method "Message out of bounds");
   let x = NE.get_uint32 t.buffer t.next in
   t.next <- t.next + 4;
   x
 
-let add_int t x =
-  NE.set_uint32 t.buffer t.next x;
-  t.next <- t.next + 4
-
-let[@ocaml.inline always] length_to_advance (read: Cstruct.uint32) (remaining:int): int =
+let length_to_advance (read: Cstruct.uint32) (remaining:int): int =
   (* Convert the uint32 to an int64. OCaml sign extends,
      but we want zero extension, so mask the top bits off.
      Otherwise a negative value could bypass the subsequent
@@ -49,6 +51,11 @@ let[@ocaml.inline always] length_to_advance (read: Cstruct.uint32) (remaining:in
     invalid_method "Message out of bounds"
   else
     Int64.to_int sixtyfour_len
+  [@@ocaml.inline always]
+
+let add_int t x =
+  NE.set_uint32 t.buffer t.next x;
+  t.next <- t.next + 4
 
 let raw_get_string t len remaining =
   let to_advance = length_to_advance len remaining in
@@ -76,15 +83,6 @@ let get_string_opt t =
   let len = get_int t in
   if len = 0l then None
   else Some(raw_get_string t len (t.buffer.len - t.next))
-
-
-(* libwayland cannot handle messages more than 4096 bytes, and 1.23
-   even goes into a loop on them. *)
-let max_msg_len = 4096
-(* 8 for header, 4 for length, 1 for ['\0']-terminator. *)
-let max_string_len = max_msg_len - 13
-(* 8 for header, 4 for length. *)
-let max_array_len = max_msg_len - 12
 
 let add_string t v =
   if String.length v > max_string_len then

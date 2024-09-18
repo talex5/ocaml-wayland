@@ -6,6 +6,24 @@ type ('a, 'rw) t constraint 'rw = [< `R | `W]
 val pp_args : Metadata.arg list -> _ t Fmt.t
 (** [pp_args types] is a formatter for messages with argument types [types]. *)
 
+(** {2 Protocol Constants} *)
+
+val hdr_len : int
+(** [hdr_len] is the length of the Wayland protocol header (8 bytes). *)
+
+val max_msg_len : int
+(** [max_msg_len] is the maximum length of an encoded Wayland message in bytes,
+    including the 8-byte header.  It is equal to 4096 bytes. *)
+
+val max_array_len : int
+(** [max_array_len] is the maximum length a Wayland array.
+    It is equal to [max_msg_len - hdr_len - 4], where the 4 is
+    from the length prefix. *)
+
+val max_string_len : int
+(** [max_string_len] is the maximum length of a Wayland string in bytes.
+    It is equal to [max_array_len - 1], where the 1 is for the ['\0']-terminator. *)
+    
 (** {2 Reading messages} *)
 
 val parse : fds:Unix.file_descr Queue.t -> Cstruct.t -> ('a, [`R]) t option
