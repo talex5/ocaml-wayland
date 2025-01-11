@@ -4,76 +4,242 @@
   (libraries wayland))
 
 (rule
- (targets xdg_shell_client.ml xdg_shell_server.ml xdg_shell_proto.ml)
- (deps   xdg-shell.xml)
- (action (run %{bin:wayland-scanner-ocaml} --open Wayland.Wayland_proto %{deps})))
+ (targets alpha_modifier_v1_client.ml alpha_modifier_v1_server.ml alpha_modifier_v1_proto.ml)
+ (deps    alpha-modifier-v1.xml)
+ (action  (run %{bin:wayland-scanner-ocaml} --open Wayland.Wayland_proto %{deps})))
+
+(rule
+ (targets content_type_v1_client.ml content_type_v1_server.ml content_type_v1_proto.ml)
+ (deps    content-type-v1.xml)
+ (action  (run %{bin:wayland-scanner-ocaml} --open Wayland.Wayland_proto %{deps})))
+
+(rule
+ (targets cursor_shape_v1_client.ml cursor_shape_v1_server.ml cursor_shape_v1_proto.ml)
+ (deps    cursor-shape-v1.xml)
+ (action  (run %{bin:wayland-scanner-ocaml} --open Wayland.Wayland_proto,Tablet_v2_proto %{deps})))
+
+(rule
+ (targets drm_lease_v1_client.ml drm_lease_v1_server.ml drm_lease_v1_proto.ml)
+ (deps    drm-lease-v1.xml)
+ (action  (run %{bin:wayland-scanner-ocaml} --open Wayland.Wayland_proto %{deps})))
+
+(rule
+ (targets ext_foreign_toplevel_list_v1_client.ml ext_foreign_toplevel_list_v1_server.ml ext_foreign_toplevel_list_v1_proto.ml)
+ (deps    ext-foreign-toplevel-list-v1.xml)
+ (action  (run %{bin:wayland-scanner-ocaml} --open Wayland.Wayland_proto %{deps})))
+
+(rule
+ (targets ext_idle_notify_v1_client.ml ext_idle_notify_v1_server.ml ext_idle_notify_v1_proto.ml)
+ (deps    ext-idle-notify-v1.xml)
+ (action  (run %{bin:wayland-scanner-ocaml} --open Wayland.Wayland_proto %{deps})))
+
+(rule
+ (targets ext_session_lock_v1_client.ml ext_session_lock_v1_server.ml ext_session_lock_v1_proto.ml)
+ (deps    ext-session-lock-v1.xml)
+ (action  (run %{bin:wayland-scanner-ocaml} --open Wayland.Wayland_proto %{deps})))
+
+(rule
+ (targets ext_transient_seat_v1_client.ml ext_transient_seat_v1_server.ml ext_transient_seat_v1_proto.ml)
+ (deps    ext-transient-seat-v1.xml)
+ (action  (run %{bin:wayland-scanner-ocaml} --open Wayland.Wayland_proto %{deps})))
+
+(rule
+ (targets fractional_scale_v1_client.ml fractional_scale_v1_server.ml fractional_scale_v1_proto.ml)
+ (deps    fractional-scale-v1.xml)
+ (action  (run %{bin:wayland-scanner-ocaml} --open Wayland.Wayland_proto %{deps})))
+
+(rule
+ (targets fullscreen_shell_unstable_v1_client.ml fullscreen_shell_unstable_v1_server.ml fullscreen_shell_unstable_v1_proto.ml)
+ (deps    fullscreen-shell-unstable-v1.xml)
+ (action  (run %{bin:wayland-scanner-ocaml} --open Wayland.Wayland_proto %{deps})))
 
 (rule
  (targets gtk_primary_selection_client.ml gtk_primary_selection_server.ml gtk_primary_selection_proto.ml)
- (deps   gtk-primary-selection.xml)
- (action (run %{bin:wayland-scanner-ocaml} --open Wayland.Wayland_proto %{deps})))
+ (deps    gtk-primary-selection.xml)
+ (action  (run %{bin:wayland-scanner-ocaml} --open Wayland.Wayland_proto %{deps})))
 
 (rule
- (targets wp_primary_selection_unstable_v1_client.ml wp_primary_selection_unstable_v1_server.ml wp_primary_selection_unstable_v1_proto.ml)
- (deps   primary-selection-unstable-v1.xml)
- (action (run %{bin:wayland-scanner-ocaml} --open Wayland.Wayland_proto %{deps})))
+ (targets idle_inhibit_unstable_v1_client.ml idle_inhibit_unstable_v1_server.ml idle_inhibit_unstable_v1_proto.ml)
+ (deps    idle-inhibit-unstable-v1.xml)
+ (action  (run %{bin:wayland-scanner-ocaml} --open Wayland.Wayland_proto %{deps})))
 
 (rule
- (targets xdg_output_unstable_v1_client.ml xdg_output_unstable_v1_server.ml xdg_output_unstable_v1_proto.ml)
- (deps   xdg-output-unstable-v1.xml)
- (action (run %{bin:wayland-scanner-ocaml} --open Wayland.Wayland_proto %{deps})))
+ (targets input_method_unstable_v1_client.ml input_method_unstable_v1_server.ml input_method_unstable_v1_proto.ml)
+ (deps    input-method-unstable-v1.xml)
+ (action  (run %{bin:wayland-scanner-ocaml} --open Wayland.Wayland_proto %{deps})))
+
+(rule
+ (targets input_timestamps_unstable_v1_client.ml input_timestamps_unstable_v1_server.ml input_timestamps_unstable_v1_proto.ml)
+ (deps    input-timestamps-unstable-v1.xml)
+ (action  (run %{bin:wayland-scanner-ocaml} --open Wayland.Wayland_proto %{deps})))
+
+(rule
+ (targets keyboard_shortcuts_inhibit_unstable_v1_client.ml keyboard_shortcuts_inhibit_unstable_v1_server.ml keyboard_shortcuts_inhibit_unstable_v1_proto.ml)
+ (deps    keyboard-shortcuts-inhibit-unstable-v1.xml)
+ (action  (run %{bin:wayland-scanner-ocaml} --open Wayland.Wayland_proto %{deps})))
+
+(rule
+ (targets linux_dmabuf_v1_client.ml linux_dmabuf_v1_server.ml linux_dmabuf_v1_proto.ml)
+ (deps    linux-dmabuf-v1.xml)
+ (action  (run %{bin:wayland-scanner-ocaml} --open Wayland.Wayland_proto %{deps})))
+
+(rule
+ (targets linux_drm_syncobj_v1_client.ml linux_drm_syncobj_v1_server.ml linux_drm_syncobj_v1_proto.ml)
+ (deps    linux-drm-syncobj-v1.xml)
+ (action  (run %{bin:wayland-scanner-ocaml} --open Wayland.Wayland_proto %{deps})))
+
+(rule
+ (targets zwp_linux_explicit_synchronization_unstable_v1_client.ml
+ 	  zwp_linux_explicit_synchronization_unstable_v1_server.ml
+	  zwp_linux_explicit_synchronization_unstable_v1_proto.ml)
+ (deps    linux-explicit-synchronization-unstable-v1.xml)
+ (action  (run %{bin:wayland-scanner-ocaml} --open Wayland.Wayland_proto %{deps})))
+
+(rule
+ (targets pointer_constraints_unstable_v1_client.ml pointer_constraints_unstable_v1_server.ml pointer_constraints_unstable_v1_proto.ml)
+ (deps    pointer-constraints-unstable-v1.xml)
+ (action  (run %{bin:wayland-scanner-ocaml} --open Wayland.Wayland_proto %{deps})))
+
+(rule
+ (targets pointer_gestures_unstable_v1_client.ml pointer_gestures_unstable_v1_server.ml pointer_gestures_unstable_v1_proto.ml)
+ (deps    pointer-gestures-unstable-v1.xml)
+ (action  (run %{bin:wayland-scanner-ocaml} --open Wayland.Wayland_proto %{deps})))
+
+(rule
+ (targets presentation_time_client.ml presentation_time_server.ml presentation_time_proto.ml)
+ (deps    presentation-time.xml)
+ (action  (run %{bin:wayland-scanner-ocaml} --open Wayland.Wayland_proto %{deps})))
+
+(rule
+ (targets wp_primary_selection_unstable_v1_client.ml
+ 	  wp_primary_selection_unstable_v1_server.ml
+	  wp_primary_selection_unstable_v1_proto.ml)
+ (deps    primary-selection-unstable-v1.xml)
+ (action  (run %{bin:wayland-scanner-ocaml} --open Wayland.Wayland_proto %{deps})))
+
+(rule
+ (targets relative_pointer_unstable_v1_client.ml relative_pointer_unstable_v1_server.ml relative_pointer_unstable_v1_proto.ml)
+ (deps    relative-pointer-unstable-v1.xml)
+ (action  (run %{bin:wayland-scanner-ocaml} --open Wayland.Wayland_proto %{deps})))
+
+(rule
+ (targets security_context_v1_client.ml security_context_v1_server.ml security_context_v1_proto.ml)
+ (deps    security-context-v1.xml)
+ (action  (run %{bin:wayland-scanner-ocaml} --open Wayland.Wayland_proto %{deps})))
+
+(rule
+ (targets server_decoration_client.ml server_decoration_server.ml server_decoration_proto.ml)
+ (deps    server-decoration.xml)
+ (action  (run %{bin:wayland-scanner-ocaml} --open Wayland.Wayland_proto %{deps})))
+
+(rule
+ (targets single_pixel_buffer_v1_client.ml single_pixel_buffer_v1_server.ml single_pixel_buffer_v1_proto.ml)
+ (deps    single-pixel-buffer-v1.xml)
+ (action  (run %{bin:wayland-scanner-ocaml} --open Wayland.Wayland_proto %{deps})))
+
+(rule
+ (targets tablet_unstable_v1_client.ml tablet_unstable_v1_server.ml tablet_unstable_v1_proto.ml)
+ (deps    tablet-unstable-v1.xml)
+ (action  (run %{bin:wayland-scanner-ocaml} --open Wayland.Wayland_proto %{deps})))
+
+(rule
+ (targets tablet_v2_client.ml tablet_v2_server.ml tablet_v2_proto.ml)
+ (deps    tablet-v2.xml)
+ (action  (run %{bin:wayland-scanner-ocaml} --open Wayland.Wayland_proto %{deps})))
+
+(rule
+ (targets tearing_control_v1_client.ml tearing_control_v1_server.ml tearing_control_v1_proto.ml)
+ (deps    tearing-control-v1.xml)
+ (action  (run %{bin:wayland-scanner-ocaml} --open Wayland.Wayland_proto %{deps})))
+
+(rule
+ (targets text_input_unstable_v1_client.ml text_input_unstable_v1_server.ml text_input_unstable_v1_proto.ml)
+ (deps    text-input-unstable-v1.xml)
+ (action  (run %{bin:wayland-scanner-ocaml} --open Wayland.Wayland_proto %{deps})))
+
+(rule
+ (targets text_input_unstable_v3_client.ml text_input_unstable_v3_server.ml text_input_unstable_v3_proto.ml)
+ (deps    text-input-unstable-v3.xml)
+ (action  (run %{bin:wayland-scanner-ocaml} --open Wayland.Wayland_proto %{deps})))
+
+(rule
+ (targets viewporter_client.ml viewporter_server.ml viewporter_proto.ml)
+ (deps    viewporter.xml)
+ (action  (run %{bin:wayland-scanner-ocaml} --open Wayland.Wayland_proto %{deps})))
+
+(rule
+ (targets wlr_layer_shell_unstable_v1_client.ml wlr_layer_shell_unstable_v1_server.ml wlr_layer_shell_unstable_v1_proto.ml)
+ (deps    wlr-layer-shell-unstable-v1.xml)
+ (action  (run %{bin:wayland-scanner-ocaml} --open Wayland.Wayland_proto,Xdg_shell_proto %{deps})))
+
+(rule
+ (targets wlr_screencopy_unstable_v1_client.ml wlr_screencopy_unstable_v1_server.ml wlr_screencopy_unstable_v1_proto.ml)
+ (deps    wlr-screencopy-unstable-v1.xml)
+ (action  (run %{bin:wayland-scanner-ocaml} --open Wayland.Wayland_proto %{deps})))
+
+(rule
+ (targets xdg_activation_v1_client.ml xdg_activation_v1_server.ml xdg_activation_v1_proto.ml)
+ (deps    xdg-activation-v1.xml)
+ (action  (run %{bin:wayland-scanner-ocaml} --open Wayland.Wayland_proto %{deps})))
 
 (rule
  (targets xdg_decoration_unstable_v1_client.ml xdg_decoration_unstable_v1_server.ml xdg_decoration_unstable_v1_proto.ml)
- (deps   xdg-decoration-unstable-v1.xml)
- (action (run %{bin:wayland-scanner-ocaml} --open Wayland.Wayland_proto,Xdg_shell_proto %{deps})))
+ (deps    xdg-decoration-unstable-v1.xml)
+ (action  (run %{bin:wayland-scanner-ocaml} --open Wayland.Wayland_proto,Xdg_shell_proto %{deps})))
 
 (rule
-  (targets relative_pointer_unstable_v1_client.ml
-           relative_pointer_unstable_v1_server.ml
-           relative_pointer_unstable_v1_proto.ml)
-  (deps relative-pointer-unstable-v1.xml)
-  (action (run %{bin:wayland-scanner-ocaml} --open Wayland.Wayland_proto %{deps})))
-
+ (targets xdg_dialog_v1_client.ml xdg_dialog_v1_server.ml xdg_dialog_v1_proto.ml)
+ (deps    xdg-dialog-v1.xml)
+ (action  (run %{bin:wayland-scanner-ocaml} --open Wayland.Wayland_proto,Xdg_shell_proto %{deps})))
 
 (rule
-  (targets pointer_constraints_unstable_v1_client.ml
-           pointer_constraints_unstable_v1_server.ml
-           pointer_constraints_unstable_v1_proto.ml)
-  (deps pointer-constraints-unstable-v1.xml)
-  (action (run %{bin:wayland-scanner-ocaml} --open Wayland.Wayland_proto %{deps})))
+ (targets xdg_foreign_unstable_v1_client.ml xdg_foreign_unstable_v1_server.ml xdg_foreign_unstable_v1_proto.ml)
+ (deps    xdg-foreign-unstable-v1.xml)
+ (action  (run %{bin:wayland-scanner-ocaml} --open Wayland.Wayland_proto %{deps})))
 
 (rule
- (targets server_decoration_client.ml
-          server_decoration_server.ml
-          server_decoration_proto.ml)
- (deps   server-decoration.xml)
- (action (run %{bin:wayland-scanner-ocaml} --open Wayland.Wayland_proto %{deps})))
+ (targets xdg_foreign_unstable_v2_client.ml xdg_foreign_unstable_v2_server.ml xdg_foreign_unstable_v2_proto.ml)
+ (deps    xdg-foreign-unstable-v2.xml)
+ (action  (run %{bin:wayland-scanner-ocaml} --open Wayland.Wayland_proto %{deps})))
 
 (rule
- (targets wlr_screencopy_unstable_v1_client.ml
-          wlr_screencopy_unstable_v1_server.ml
-          wlr_screencopy_unstable_v1_proto.ml)
- (deps   wlr-screencopy-unstable-v1.xml)
- (action (run %{bin:wayland-scanner-ocaml} --open Wayland.Wayland_proto %{deps})))
+ (targets xdg_output_unstable_v1_client.ml xdg_output_unstable_v1_server.ml xdg_output_unstable_v1_proto.ml)
+ (deps    xdg-output-unstable-v1.xml)
+ (action  (run %{bin:wayland-scanner-ocaml} --open Wayland.Wayland_proto %{deps})))
 
 (rule
- (targets wlr_layer_shell_unstable_v1_client.ml
-          wlr_layer_shell_unstable_v1_server.ml
-          wlr_layer_shell_unstable_v1_proto.ml)
- (deps wlr-layer-shell-unstable-v1.xml)
- (action (run %{bin:wayland-scanner-ocaml} --open Wayland.Wayland_proto,Xdg_shell_proto %{deps})))
+ (targets xdg_shell_unstable_v5_client.ml xdg_shell_unstable_v5_server.ml xdg_shell_unstable_v5_proto.ml)
+ (deps    xdg-shell-unstable-v5.xml)
+ (action  (run %{bin:wayland-scanner-ocaml} --open Wayland.Wayland_proto %{deps})))
 
 (rule
- (targets drm_client.ml
-          drm_server.ml
-          drm_proto.ml)
- (deps   wayland-drm.xml)
- (action (run %{bin:wayland-scanner-ocaml} --open Wayland.Wayland_proto %{deps})))
+ (targets xdg_shell_unstable_v6_client.ml xdg_shell_unstable_v6_server.ml xdg_shell_unstable_v6_proto.ml)
+ (deps    xdg-shell-unstable-v6.xml)
+ (action  (run %{bin:wayland-scanner-ocaml} --open Wayland.Wayland_proto %{deps})))
 
 (rule
- (targets linux_dmabuf_unstable_v1_client.ml
-          linux_dmabuf_unstable_v1_server.ml
-          linux_dmabuf_unstable_v1_proto.ml)
- (deps   linux-dmabuf-unstable-v1.xml)
- (action (run %{bin:wayland-scanner-ocaml} --open Wayland.Wayland_proto %{deps})))
+ (targets xdg_shell_client.ml xdg_shell_server.ml xdg_shell_proto.ml)
+ (deps    xdg-shell.xml)
+ (action  (run %{bin:wayland-scanner-ocaml} --open Wayland.Wayland_proto %{deps})))
+
+(rule
+ (targets xdg_toplevel_drag_v1_client.ml xdg_toplevel_drag_v1_server.ml xdg_toplevel_drag_v1_proto.ml)
+ (deps    xdg-toplevel-drag-v1.xml)
+ (action  (run %{bin:wayland-scanner-ocaml} --open Wayland.Wayland_proto,Xdg_shell_proto %{deps})))
+
+(rule
+ (targets xdg_toplevel_icon_v1_client.ml
+          xdg_toplevel_icon_v1_server.ml
+          xdg_toplevel_icon_v1_proto.ml)
+ (deps    xdg-toplevel-icon-v1.xml)
+ (action  (run %{bin:wayland-scanner-ocaml} --open Wayland.Wayland_proto,Xdg_shell_proto %{deps})))
+
+(rule
+ (targets xwayland_keyboard_grab_unstable_v1_client.ml xwayland_keyboard_grab_unstable_v1_server.ml xwayland_keyboard_grab_unstable_v1_proto.ml)
+ (deps    xwayland-keyboard-grab-unstable-v1.xml)
+ (action  (run %{bin:wayland-scanner-ocaml} --open Wayland.Wayland_proto %{deps})))
+
+(rule
+ (targets xwayland_shell_v1_client.ml xwayland_shell_v1_server.ml xwayland_shell_v1_proto.ml)
+ (deps    xwayland-shell-v1.xml)
+ (action  (run %{bin:wayland-scanner-ocaml} --open Wayland.Wayland_proto %{deps})))

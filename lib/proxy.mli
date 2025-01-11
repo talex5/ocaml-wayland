@@ -1,6 +1,6 @@
 (** {2 Types} *)
 
-type ('a, +'v, 'role) t
+type ('a, +'v, 'role) t = ('a, 'v, 'role) Internal.versioned_proxy
 (** An [('a, 'v, 'role) t] is a proxy used by ['role] to send messages to an object with interface ['a] and version in ['v]. *)
 
 val user_data : ('a, _, 'role) t -> ('a, 'role) S.user_data
@@ -216,3 +216,17 @@ val wrong_type : parent:_ t -> expected:string -> _ t -> 'a
 (** [wrong_type ~parent ~expected t] fails with an exception complaining that [t] should have type [expected]. *)
 
 val trace : (module TRACE with type role = 'role) -> 'role Internal.tracer
+
+val post_error : ('a, [>`V1], [<`Server]) t -> code:int32 -> message:string -> 'b
+(** [post_error t ~code ~message] raises a protocol error with code [code] and message [message].
+    It does not return. *)
+
+val invalid_method_number : _proxy:(_, [>`V1], [<`Client|`Server]) t -> number:int -> 'a
+(** Raise an error indicating that an invalid method number is used in a request or event. *)
+
+val invalid_enum : _proxy:(_, [>`V1], [<`Server|`Client]) t -> value:int32 -> name:string -> 'a
+(** Raise an error indicating that an invalid enum value is used in a request.
+    On error, this raises an exception and therefore does not return.
+    Normally, one will let the Wayland server library catch this exception,
+    but one can catch it if one wishes.  If the exception is caught
+ *)

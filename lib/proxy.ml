@@ -1,6 +1,6 @@
 open Internal
 
-type ('a, 'v, 'role) t = ('a, 'role) Internal.proxy
+type ('a, 'v, 'role) t = ('a, 'v, 'role) versioned_proxy
 
 type ('a, 'v, 'role) proxy = ('a, 'v, 'role) t
 
@@ -13,6 +13,24 @@ module type TRACE = sig
 end
 
 let pp = pp_proxy
+
+let[@ocaml.inline never] invalid_object message =
+  raise (Msg.Error { object_id = 1l; code = 0l; message })
+
+let[@ocaml.inline never] invalid_method_number ~_proxy ~(number:int) =
+  Stdlib.Format.asprintf "Object %lu: Invalid method ID %u" _proxy.id number |>
+    Msg.invalid_method
+
+let invalid_enum ~(_proxy: (_, [>`V1], [<`Server|`Client]) t) ~(value:int32) ~(name:string): 'a =
+  let message = Format.asprintf "Invalid enum value %ld for enum %s in message to object %a with version %ld"
+                  value name pp_proxy _proxy (_proxy.version) in
+  raise (Msg.Error { object_id = 1l; code = 1l; message})
+
+let[@ocaml.inline never] server_allocated_id id =
+  Format.asprintf "ID %lu is server-allocated" id |> invalid_object
+
+let[@ocaml.inline never] object_already_exists id =
+  Format.asprintf "An object with ID 0x%lx already exists!" id |> invalid_object
 
 let missing_dispatch _ = failwith "no handler registered!"
 
@@ -33,11 +51,11 @@ let accept_new t ~version ~handler id =
   let conn = t.conn in
   let is_service_allocated_id = (Int32.unsigned_compare id 0xFF000000l >= 0) in
   begin match conn.role with
-    | `Client -> assert is_service_allocated_id
-    | `Server -> assert (not is_service_allocated_id)
+  | `Client -> assert is_service_allocated_id
+  | `Server when is_service_allocated_id -> server_allocated_id id
+  | `Server -> ()
   end;
-  if Objects.mem id conn.objects then
-    Fmt.failwith "An object with ID %lu already exists!" id;
+  (if Objects.mem id conn.objects then object_already_exists id);
   let t' = make_proxy id ~version ~conn ~handler in
   conn.objects <- Objects.add id (Generic t') conn.objects;
   t'
@@ -116,13 +134,16 @@ let id t =
   if t.can_send then t.id
   else Fmt.invalid_arg "Attempt to use %a after destroying it" pp t
 
+let post_error t ~code ~message =
+  raise (Msg.Error { object_id = id t; code = code; message = message })
+
 let id_opt = function
   | None -> 0l
   | Some t -> id t
 
 let alloc t = Msg.alloc ~obj:t.id
 
-let send (type a) (t:_ t) (msg : (a, [`W]) Msg.t) =
+let send (type a) (t: (_, _, [<`Client|`Server]) t) (msg : (a, [`W]) Msg.t) =
   t.conn.trace.outbound t msg;
   if t.can_send then
     enqueue t.conn (Msg.cast msg)
@@ -144,11 +165,12 @@ let spawn_bind (t : (_, _, 'role) t) ((handler : ('a, 'v, 'role) #Service_handle
   let max_version = handler#max_version in
   if version < min_version then
     Fmt.failwith "Can't ask for %s version %ld when handler requires version >= %ld"
-      (Handler.interface handler) version min_version;
-  if version > max_version then
+      (Handler.interface handler) version min_version
+  else if version > max_version then
     Fmt.failwith "Can't ask for %s version %ld when handler requires version <= %ld"
-      (Handler.interface handler) version max_version;
-  spawn_generic t ~version handler
+      (Handler.interface handler) version max_version
+  else
+    spawn_generic t ~version handler
 
 let user_data (t:_ t) = t.handler#user_data
 
@@ -172,7 +194,7 @@ let add_root conn (handler : (_, _, _) #Handler.t) =
 let on_delete t fn =
   Queue.add fn t.on_delete
 
-let delete t =
+let delete (t: ('a, [< `Client | `Server]) Internal.proxy): unit =
   let conn = t.conn in
   match Objects.find_opt t.id conn.objects with
   | Some (Generic t') when Obj.repr t == Obj.repr t' ->
@@ -217,8 +239,11 @@ let lookup_other (t : _ t) id =
     else
       Fmt.failwith "Message referred to object %a, which cannot receive further messages" pp p
 
-let wrong_type ~parent ~expected t =
-  Fmt.failwith "Object %a referenced object %a, which should be of type %S but isn't'" pp parent pp t expected
+let[@inline never] wrong_type ~parent ~expected t =
+  let message =
+    Format.asprintf "Object %a referenced object %a, which should be of type %S but isn't'"
+    pp parent pp t expected in
+  raise (Msg.Error { object_id = 1l; code = 1l; message })
 
 let trace (type r) (module T : TRACE with type role = r) = {
   inbound = T.inbound;

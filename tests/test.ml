@@ -46,8 +46,8 @@ module S = struct
     Proxy.Handler.attach m @@ object
       inherit [_] Wl_data_offer.v1
 
-      method on_set_actions t ~dnd_actions:_ ~preferred_action =
-        Wl_data_offer.action t ~dnd_action:preferred_action
+      method on_set_actions t ~untrusted_dnd_actions:_ ~untrusted_preferred_action =
+        Wl_data_offer.action t ~dnd_action:untrusted_preferred_action
 
       method on_receive _ = failwith "Not implemented"
       method on_finish _ = failwith "Not implemented"
@@ -60,10 +60,10 @@ module S = struct
     Proxy.Handler.attach r @@ object
       inherit [_] Wl_region.v1
       method! user_data = Server (Region rects)
-      method on_add _ ~x ~y ~width ~height =
-        rects := { x; y; width; height } :: !rects
+      method on_add _ ~untrusted_x ~untrusted_y ~untrusted_width ~untrusted_height =
+        rects := { x = untrusted_x; y = untrusted_y; width = untrusted_width; height = untrusted_height } :: !rects
       method on_destroy t = Proxy.delete t
-      method on_subtract _ ~x:_ ~y:_ ~width:_ ~height:_ = failwith "Not implemented"
+      method on_subtract _ ~untrusted_x:_ ~untrusted_y:_ ~untrusted_width:_ ~untrusted_height:_ = failwith "Not implemented"
     end
 
   let make_surface t m =
@@ -72,9 +72,9 @@ module S = struct
     log t "Created surface %d" sid;
     Proxy.Handler.attach m @@ object
       inherit [_] Wl_surface.v1
-      method on_attach _ ~buffer:_ ~x:_ ~y:_ = failwith "Not implemented"
+      method on_attach _ ~buffer:_ ~untrusted_x:_ ~untrusted_y:_ = failwith "Not implemented"
       method on_commit _ = failwith "Not implemented"
-      method on_damage _ ~x:_ ~y:_ ~width:_ ~height:_ = failwith "Not implemented"
+      method on_damage _ ~untrusted_x:_ ~untrusted_y:_ ~untrusted_width:_ ~untrusted_height:_ = failwith "Not implemented"
       method on_destroy = failwith "Not implemented"
       method on_frame _ _callback = failwith "Not implemented"
       method on_set_input_region _ ~region =
@@ -119,11 +119,11 @@ module S = struct
         method on_get_registry _ reg =
           Proxy.Handler.attach reg @@ object
             inherit [_] Wl_registry.v1
-            method on_bind : type a. _ -> name:int32 -> (a, [`Unknown], _) Proxy.t -> unit =
-              fun _ ~name proxy ->
+            method on_bind : type a. _ -> untrusted_name:int32 -> (a, [`Unknown], _) Proxy.t -> unit =
+              fun _ ~untrusted_name proxy ->
               match Proxy.ty proxy with
               | Wayland_proto.Wl_compositor.T ->
-                assert (name = comp_name);
+                assert (untrusted_name = comp_name);
                 make_compositor t proxy
               | _ -> Fmt.failwith "Invalid service name for %a" Proxy.pp proxy
           end;

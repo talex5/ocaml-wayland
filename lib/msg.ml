@@ -1,11 +1,6 @@
-module type ENDIAN = (module type of Cstruct.BE)
+module NE = Cstruct.HE
 
-let ne =
-  if Sys.big_endian then (module Cstruct.BE : ENDIAN)
-  else (module Cstruct.LE : ENDIAN)
-
-(* Native endian *)
-module NE = (val ne)
+exception Error of { object_id: int32; code: int32; message: string }
 
 type 'rw generic = {
   buffer : Cstruct.t;
@@ -25,43 +20,96 @@ let op t =
     NE.get_uint16 t.buffer 4
   )
 
+let[@ocaml.inline never] bad_implementation message =
+  raise (Error { object_id = 1l; code = 3l; message })
+let[@ocaml.inline never] invalid_method message =
+  raise (Error { object_id = 1l; code = 1l; message })
+let[@ocaml.inline never] trailing_junk expected actual direction =
+  Format.asprintf "Bad message: expected length %d, actual length %d" expected actual |>
+  if direction then invalid_method else invalid_arg
+
+
+let hdr_len = 8
+let max_msg_len = 4096
+let max_array_len = max_msg_len - hdr_len - 4
+let max_string_len = max_array_len - 1
+
 let get_int t =
+  (if t.next > t.buffer.len - 4 then invalid_method "Message out of bounds");
   let x = NE.get_uint32 t.buffer t.next in
   t.next <- t.next + 4;
   x
+
+let length_to_advance (read: Cstruct.uint32) (remaining:int): int =
+  (* Convert the uint32 to an int64. OCaml sign extends,
+     but we want zero extension, so mask the top bits off.
+     Otherwise a negative value could bypass the subsequent
+     checks. *)
+  let read = Int64.logand (Int64.of_int32 read) 0xFFFFFFFFL in
+  let sixtyfour_len = Int64.logand (Int64.add read 3L) (-4L) in
+  if sixtyfour_len > Int64.of_int remaining then
+    invalid_method "Message out of bounds"
+  else
+    Int64.to_int sixtyfour_len
+  [@@ocaml.inline always]
 
 let add_int t x =
   NE.set_uint32 t.buffer t.next x;
   t.next <- t.next + 4
 
+let raw_get_string t len remaining =
+  let to_advance = length_to_advance len remaining in
+  let next = t.next in
+  let len = Int32.to_int len - 1 in
+  if Cstruct.get t.buffer (next + len) <> '\000' then
+    invalid_method "String not NUL-terminated"
+  else (
+    t.next <- next + to_advance;
+    let s = Cstruct.to_string t.buffer ~off:next ~len in
+    if String.contains s '\000' then
+      invalid_method "String contains embedded NUL bytes"
+    else if not (String.is_valid_utf_8 s) then
+      invalid_method "String is not valid UTF-8"
+    else
+      s
+  )
+
 let get_string t =
-  let cs = Cstruct.shift t.buffer t.next in
-  let len_excl_term = (NE.get_uint32 cs 0 |> Int32.to_int) - 1 in
-  t.next <- t.next + 4 + ((len_excl_term + 4) land -4);
-  Cstruct.to_string cs ~off:4 ~len:len_excl_term
+  let len = get_int t in
+  if len = 0l then invalid_method "No string provided"
+  else raw_get_string t len (t.buffer.len - t.next)
 
 let get_string_opt t =
-  let cs = Cstruct.shift t.buffer t.next in
-  let len_excl_term = (NE.get_uint32 cs 0 |> Int32.to_int) - 1 in
-  t.next <- t.next + 4 + ((len_excl_term + 4) land -4);
-  if len_excl_term = -1 then None
-  else Some (Cstruct.to_string cs ~off:4 ~len:len_excl_term)
+  let len = get_int t in
+  if len = 0l then None
+  else Some(raw_get_string t len (t.buffer.len - t.next))
 
 let add_string t v =
-  let len_excl_term = String.length v in
-  add_int t (Int32.of_int (len_excl_term + 1));
-  Cstruct.blit_from_string v 0 t.buffer t.next len_excl_term;
-  t.next <- t.next + ((len_excl_term + 4) land -4)
+  if String.length v > max_string_len then
+    invalid_arg "String is too long to fit in a Wayland message"
+  else if String.contains v '\000' then
+    invalid_arg "Wayland strings cannot contain NUL bytes"
+  else if not (String.is_valid_utf_8 v) then
+    invalid_arg "Wayland strings must be valid UTF-8"
+  else (
+    let len_excl_term = String.length v in
+    let len = len_excl_term + 1 in
+    add_int t (Int32.of_int len);
+    Cstruct.blit_from_string v 0 t.buffer t.next len_excl_term;
+    t.next <- t.next + ((len_excl_term + 4) land -4)
+  )
 
 let add_string_opt t = function
   | None -> add_int t Int32.zero
   | Some v -> add_string t v
 
 let get_array t =
-  let cs = Cstruct.shift t.buffer t.next in
-  let len = NE.get_uint32 cs 0 |> Int32.to_int in
-  t.next <- t.next + 4 + ((len + 3) land -4);
-  Cstruct.to_string cs ~off:4 ~len
+  let len = get_int t in
+  let to_advance = length_to_advance len (t.buffer.len - t.next) in
+  let len = Int32.to_int len in
+  let res = Cstruct.to_string t.buffer ~off:t.next ~len in
+  t.next <- t.next + to_advance;
+  res
 
 let add_array t v =
   let len = String.length v in
@@ -81,19 +129,33 @@ let get_fixed t =
 let add_fixed t v =
   add_int t (Fixed.to_bits v)
 
+let check_end t direction =
+  let expected = Cstruct.length t.buffer
+  and actual = t.next
+  in if expected <> actual then trailing_junk expected actual direction
+
 let rec count_strings acc = function
+  | _ when acc > max_msg_len -> invalid_arg "Message length overflow"
   | [] -> acc
-  | None :: ss ->
-    count_strings (acc + 4) ss
+  | None :: ss -> count_strings (acc + 4) ss
   | Some s :: ss ->
-    let len = 4 + (String.length s + 4) land -4 in (* Note: includes ['\0'] terminator *)
-    count_strings (acc + len) ss
+    let bare_len = String.length s in
+    if bare_len > max_string_len then
+      invalid_arg "String too long to send"
+    else
+      let len = 4 + ((bare_len + 4) land -4) in (* Note: includes ['\0'] terminator *)
+      count_strings (acc + len) ss
 
 let rec count_arrays acc = function
+  | _ when acc > max_msg_len -> invalid_arg "Message length overflow"
   | [] -> acc
   | x :: xs ->
-    let len = 4 + (String.length x + 3) land -4 in
-    count_arrays (acc + len) xs
+    let bare_len = String.length x in
+    if bare_len > max_array_len then
+      invalid_arg "Array too long to send"
+    else
+      let len = 4 + (bare_len + 3) land -4 in
+      count_arrays (acc + len) xs
 
 let alloc ~obj ~op ~ints ~strings ~arrays =
   let len = count_arrays (count_strings (8 + ints * 4) strings) arrays in
@@ -111,7 +173,8 @@ let alloc ~obj ~op ~ints ~strings ~arrays =
 let buffer t = t.buffer.buffer
 
 let parse ~fds cs =
-  if Cstruct.length cs >= 8 then (
+  let buffer_length = Cstruct.length cs in
+  if buffer_length >= 8 then (
     let len =
       if Sys.big_endian then (
         NE.get_uint16 cs 4
@@ -119,8 +182,11 @@ let parse ~fds cs =
         NE.get_uint16 cs 6
       )
     in
-    if Cstruct.length cs >= len then (
-      Some { buffer = Cstruct.sub cs 0 len; next = 8; fds }
+    if buffer_length >= len then (
+      let buffer = Cstruct.sub cs 0 len in
+      ( assert (Cstruct.length buffer = len)
+      ; Some { buffer; next = 8; fds }
+      )
     ) else (
       None
     )

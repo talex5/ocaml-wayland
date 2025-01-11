@@ -32,7 +32,7 @@ let draw_frame t =
       ~width:(Int32.of_int t.width)
       ~height:(Int32.of_int t.height)
       ~stride:(Int32.of_int stride)
-      ~format:Wl_shm.Format.Xrgb8888
+      ~format:0l
     @@ object
       inherit [_] Wl_buffer.v1
       method on_release = Wl_buffer.destroy
