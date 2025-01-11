@@ -73,7 +73,7 @@ let pp_tvars f = function
 
 let pp_type ~role ~next_tvar iface f (arg:Arg.t) =
   begin match arg.ty with
-    | `Uint | `Int when arg.enum <> None -> Fmt.pf f "%a.t" (pp_enum_module iface) arg
+    | `Uint | `Int when (arg.enum <> None) && (role = `Server) -> Fmt.pf f "%a.t" (pp_enum_module iface) arg
     | `Uint | `Int -> Fmt.string f "int32"
     | `String -> Fmt.string f "string"
     | `Array -> Fmt.string f "string"
@@ -463,7 +463,7 @@ let make_wrappers ~opens ~internal role (protocol : Protocol.t) f =
                     line "Msg.add_int _msg (Proxy.id%s %s);"
                       (if arg.allow_null then "_opt" else "")
                       m
-                  | `Int | `Uint when arg.enum <> None ->
+                  | `Int | `Uint when (role = `Client && arg.enum <> None) ->
                     line "Msg.add_int _msg (%a.to_int32 %s);"
                       (pp_enum_module iface) arg m
                   | _ ->
@@ -520,7 +520,7 @@ let make_wrappers ~opens ~internal role (protocol : Protocol.t) f =
           msg.args |> List.iteri (fun i (arg : Arg.t) ->
               let m = mangle ~role ~direction:Inbound ~arg in
               begin match arg.ty with
-              | `Int | `Uint when arg.enum <> None ->
+              | `Int | `Uint when (arg.enum <> None && role = `Server) ->
                 line "@[<v2>let %s = %a.of_int32 ~_proxy ~value:(Msg.get_int _msg) in@]" m (pp_enum_module iface) arg
               | `New_ID None ->
                 line "let (module M%d : Metadata.S) = Msg.get_string _msg |> Iface_reg.lookup in" i;
