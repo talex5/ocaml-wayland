@@ -100,7 +100,13 @@ exception Error of { object_id: int32; code: int32; message: string }
     by the protocol.  The object_id, code, and message are used to
     construct a message sent to the client before the client is
     disconnected.  Clients can raise this exception too, but no message
-    will be sent to the server. *)
+    will be sent to the server.
+
+    Functions in this library that report protocol errors do so by raising
+    this exception.  Until this exception is caught by ocaml-wayland,
+    the connection stays open.  Therefore, one can catch this exception
+    to prevent the client from being disconnected.
+ *)
 
 val invalid_method : string -> 'a
 (** Raise an error indicating that a message is invalid *)

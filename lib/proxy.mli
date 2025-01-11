@@ -225,4 +225,8 @@ val invalid_method_number : _proxy:(_, [>`V1], [<`Client|`Server]) t -> number:i
 (** Raise an error indicating that an invalid method number is used in a request or event. *)
 
 val invalid_enum : _proxy:(_, [>`V1], [<`Server|`Client]) t -> value:int32 -> name:string -> 'a
-(** Raise an error indicating that an invalid enum value is used in a request. *)
+(** Raise an error indicating that an invalid enum value is used in a request.
+    On error, this raises an exception and therefore does not return.
+    Normally, one will let the Wayland server library catch this exception,
+    but one can catch it if one wishes.  If the exception is caught
+ *)
