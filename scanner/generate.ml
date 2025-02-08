@@ -184,10 +184,21 @@ let fix_quotes s =
   in
   unquoted 0
 
+let fix_comments =
+  let re_end_comment = Str.regexp_string "*)" in
+  Str.global_replace re_end_comment "*[])"
+
 let comment f = function
   | None -> ()
   | Some (d : Description.t) ->
-    let full = d.full |> fix_quotes |> String.split_on_char '\n' |> List.map String.trim |> trim_lines in
+    let full =
+      d.full
+      |> fix_quotes
+      |> fix_comments
+      |> String.split_on_char '\n'
+      |> List.map String.trim
+      |> trim_lines
+    in
     Fmt.pf f "@,(** @[<v>%s.@,@,%a@] *)" (String.capitalize_ascii d.summary) Fmt.(list ~sep:cut string) full
 
 let pp_strings f args =

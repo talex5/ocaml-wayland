@@ -1,4 +1,4 @@
 (executable
   (name scanner)
   (public_name wayland-scanner-ocaml)
-  (libraries xmlm cmdliner fmt))
+  (libraries xmlm cmdliner fmt str))

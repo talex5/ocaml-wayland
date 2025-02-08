@@ -104,6 +104,7 @@ module Message = struct
     description : Description.t option;
     ty : [`Normal | `Destructor];
     since : int;
+    deprecated_since : int option;
     args : Arg.t list;
   }
 
@@ -117,6 +118,7 @@ module Message = struct
       name = Xml.take_attr "name" x;
       ty = Xml.take_attr_opt "type" x |> parse_type x;
       since = Xml.take_attr_opt "since" x |> Option.value ~default:"1" |> int_of_string x;
+      deprecated_since = Xml.take_attr_opt "deprecated-since" x |> Option.map (int_of_string x);
       description = Xml.take_sole_opt "description" x Description.parse;
       args = Xml.take_elements "arg" x Arg.parse;
     }
