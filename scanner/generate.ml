@@ -18,6 +18,7 @@ let mangle name =
     | x -> x
   in
   match name with
+  | "type"
   | "method"
   | "handlers"
   | "h"
