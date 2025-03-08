@@ -9,6 +9,8 @@ wget https://gitlab.freedesktop.org/wlroots/wlroots/-/raw/master/protocol/server
 wget https://cgit.freedesktop.org/mesa/mesa/plain/src/egl/wayland/wayland-drm/wayland-drm.xml -O wayland-drm.xml
 wget https://gitlab.freedesktop.org/wayland/wayland-protocols/-/raw/main/unstable/xdg-decoration/xdg-decoration-unstable-v1.xml -O xdg-decoration-unstable-v1.xml
 wget https://gitlab.freedesktop.org/wayland/wayland-protocols/-/raw/main/unstable/xdg-output/xdg-output-unstable-v1.xml -O xdg-output-unstable-v1.xml
+wget https://gitlab.freedesktop.org/wayland/wayland-protocols/-/raw/main/stable/tablet/tablet-v2.xml -O tablet-v2.xml
+wget https://gitlab.freedesktop.org/wayland/wayland-protocols/-/raw/main/staging/cursor-shape/cursor-shape-v1.xml -O cursor-shape-v1.xml
 wget https://gitlab.freedesktop.org/wlroots/wlr-protocols/-/raw/master/unstable/wlr-screencopy-unstable-v1.xml -O wlr-screencopy-unstable-v1.xml
 wget https://gitlab.freedesktop.org/wlroots/wlr-protocols/-/raw/master/unstable/wlr-layer-shell-unstable-v1.xml -O wlr-layer-shell-unstable-v1.xml
 wget https://gitlab.freedesktop.org/wayland/wayland/-/raw/main/protocol/wayland.xml -O ../lib/wayland.xml

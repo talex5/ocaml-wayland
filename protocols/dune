@@ -84,3 +84,17 @@
           linux_dmabuf_unstable_v1_proto.ml)
  (deps   linux-dmabuf-unstable-v1.xml)
  (action (run %{bin:wayland-scanner-ocaml} --open Wayland.Wayland_proto %{deps})))
+
+(rule
+ (targets tablet_v2_client.ml
+          tablet_v2_server.ml
+          tablet_v2_proto.ml)
+ (deps   tablet-v2.xml)
+ (action (run %{bin:wayland-scanner-ocaml} --open Wayland.Wayland_proto %{deps})))
+
+(rule
+ (targets cursor_shape_v1_client.ml
+          cursor_shape_v1_server.ml
+          cursor_shape_v1_proto.ml)
+ (deps   cursor-shape-v1.xml)
+ (action (run %{bin:wayland-scanner-ocaml} --open Wayland.Wayland_proto,Tablet_v2_proto %{deps})))
