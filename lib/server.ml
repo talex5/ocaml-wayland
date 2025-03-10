@@ -48,5 +48,11 @@ let connect ?(trace=(module Trace : TRACE)) ~sw transport handler =
 
 let wl_display t = t.wl_display
 
+let implementation_error t message =
+  Connection.error t.conn ~object_id:1l ~code:3l ~message
+
+let no_memory t message =
+  Connection.error t.conn ~object_id:1l ~code:2l ~message
+
 let dump f t = Connection.dump f t.conn
 let stop t = Connection.stop t.conn

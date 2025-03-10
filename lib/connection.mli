@@ -5,9 +5,11 @@ val connect :
   trace:(module Proxy.TRACE with type role = 'role) ->
   ([< `Client | `Server] as 'role) ->
   #S.transport ->
-  ('a, 'v, 'role) #Proxy.Service_handler.t ->
-  ('role t * ('a, 'v, 'role) Proxy.t)
+  ([`Wl_display], 'v, 'role) #Proxy.Service_handler.t ->
+  ('role t * ([`Wl_display], 'v, 'role) Proxy.t)
 
 val stop : [< `Client | `Server ] t -> unit
 
 val dump : _ t Fmt.t
+
+val error : [ `Server ] t -> object_id:int32 -> code:int32 -> message:string -> unit
