@@ -3,33 +3,61 @@ open Internal
 
 type 'a t = 'a Internal.connection
 
-(* Dispatch all complete messages in [recv_buffer]. *)
+(** Dispatch all complete messages in [recv_buffer].
+    Return [true] if everything was okay and [false] to shut down the connection. *)
 let rec process_recv_buffer t recv_buffer =
   match Msg.parse ~fds:t.incoming_fds (Recv_buffer.data recv_buffer) with
-  | None -> ()
+  | None -> true
   | Some msg ->
-    begin
-      let obj = Msg.obj msg in
-      match Objects.find_opt obj t.objects with
-      | None -> Fmt.failwith "No such object %lu (op=%d)" obj (Msg.op msg);
-      | Some (Generic proxy) ->
-        let msg = Msg.cast msg in
-        t.trace.inbound proxy msg;
-        if proxy.can_recv then (
-          try
-            proxy.handler#dispatch proxy msg
-          with ex ->
-            let bt = Printexc.get_raw_backtrace () in
-            Log.err (fun f -> f "Uncaught exception handling incoming message for %a:@,%a"
-                        pp_proxy proxy Fmt.exn_backtrace (ex, bt))
-        ) else (
-          Fmt.failwith "Received message for %a, which was shut down!" pp_proxy proxy
-        )
-    end;
-    Recv_buffer.update_consumer recv_buffer (Msg.length msg);
-    (* Unix.sleepf 0.001; *)
-    (* Fmt.pr "Buffer after dispatch: %a@." Recv_buffer.dump recv_buffer; *)
-    process_recv_buffer t recv_buffer
+     let keep_going =
+       let is_server = match t.role with
+         | `Server -> true
+         | `Client -> false
+       in
+       let obj = Msg.obj msg in
+       match Objects.find_opt obj t.objects with
+       | None ->
+          let message = Format.asprintf "No such object %lu (op=%d)" obj (Msg.op msg) in
+          (if is_server then Internal.error t ~object_id:1l (* wl_display *) ~code:0l (* invalid_object *) ~message);
+          false
+       | Some (Generic proxy) ->
+          let msg = Msg.cast msg in
+          t.trace.inbound proxy msg;
+          if proxy.can_recv then (
+            try
+              proxy.handler#dispatch proxy msg;
+              true
+            with
+            | Proxy.Error { object_id; code; message } when is_server ->
+               Log.warn (fun f -> f "Protocol error handling incoming message for %a: code %d, message %s"
+                         pp_proxy proxy (Int32.to_int code) message);
+               Internal.error t ~object_id ~code ~message;
+               false
+            | ex ->
+               let bt = Printexc.get_raw_backtrace () in
+               Log.err (fun f -> f "Uncaught exception handling incoming message for %a:@,%a"
+                                   pp_proxy proxy Fmt.exn_backtrace (ex, bt));
+               if is_server then (
+                 match ex with
+                 | Out_of_memory | Stack_overflow ->
+                    Internal.error t ~object_id:1l ~code:2l ~message:"Out of memory";
+                    raise ex (* System is now in undefined state, exit! *)
+                 | _ -> Internal.error t ~object_id:1l ~code:3l ~message:"Uncaught OCaml exception"
+               );
+               false
+          ) else (
+            Fmt.failwith "Received message for %a, which was shut down!" pp_proxy proxy
+          )
+     in
+     Recv_buffer.update_consumer recv_buffer (Msg.length msg);
+     (* Unix.sleepf 0.001; *)
+     (* Fmt.pr "Buffer after dispatch: %a@." Recv_buffer.dump recv_buffer; *)
+     if keep_going then
+       process_recv_buffer t recv_buffer
+     else
+       false
+
+let stop = Internal.shutdown
 
 let listen t =
   Switch.run @@ fun sw ->
@@ -39,12 +67,16 @@ let listen t =
     List.iter (fun fd -> Queue.add (Eio_unix.Fd.remove fd |> Option.get) t.incoming_fds) fds;
     if got = 0 then (
       Log.info (fun f -> f "Got end-of-file on wayland connection");
-      t.transport#shutdown
+      stop t
     ) else (
       Recv_buffer.update_producer recv_buffer got;
       Log.debug (fun f -> f "Ring after adding %d bytes: %a" got Recv_buffer.dump recv_buffer);
-      process_recv_buffer t recv_buffer;
-      aux ()
+      if process_recv_buffer t recv_buffer then
+        aux ()
+      else (
+        Log.err (fun f -> f "Connection closed unexpectedly");
+        stop t
+      )
     )
   in
   try aux ()
@@ -66,6 +98,7 @@ let clean_up t =
 let connect ~sw ~trace role transport handler =
   let incoming_fds = Queue.create () in
   Switch.on_release sw (fun () -> Queue.iter Unix.close incoming_fds);
+  let (promise, resolver) = Eio.Promise.create () in
   let t = {
     sw;
     transport = (transport :> S.transport);
@@ -77,16 +110,20 @@ let connect ~sw ~trace role transport handler =
     incoming_fds;
     outbox = Queue.create ();
     trace = Proxy.trace trace;
+    display_proxy = None;
+    error = No_error;
+    promise;
+    resolver;
   } in
   let display_proxy = Proxy.add_root t (handler :> _ Proxy.Handler.t) in
+  t.display_proxy <- Some display_proxy;
   Eio.Fiber.fork ~sw (fun () ->
       Fun.protect (fun () -> listen t)
         ~finally:(fun () -> clean_up t)
     );
   (t, display_proxy)
 
-let stop t =
-  t.transport#shutdown
+let error (t: [`Server] t) = Internal.error t
 
 let dump f t =
   let pp_item f (_id, Generic proxy) = pp_proxy f proxy in
