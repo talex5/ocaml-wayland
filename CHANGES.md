@@ -4,6 +4,8 @@
 
 - Add viewporter protocol (@talex5 #50).
 
+- Suppress `unused-type-declaration` in generated code, for OCaml 5.4.
+
 # v2.1
 
 - Add relative-pointer-v1 (@Mic92 #40).

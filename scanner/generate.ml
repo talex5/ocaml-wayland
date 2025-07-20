@@ -327,7 +327,7 @@ let pp_msg_handler_sig ~role ~iface ~pp_self f (msg : Message.t) =
 let make_wrappers ~opens ~internal role (protocol : Protocol.t) f =
   let parents = Parent.index protocol in
   let line fmt = Fmt.pf f ("@," ^^ fmt) in
-  line {|[@@@@@@ocaml.warning "-27"]|};
+  line {|[@@@@@@ocaml.warning "-27-34"]|};
   line "@[<v2>open struct";
   line "@[<v2>module Imports = struct";
   line "include %s_proto" (module_name protocol.name);
