@@ -98,6 +98,9 @@ module Arg = struct
     }
 end
 
+let max_args = 20
+(** [WL_CLOSURE_MAX_ARGS] in libwayland *)
+
 module Message = struct
   type t = {
     name : string;
@@ -114,7 +117,7 @@ module Message = struct
     | Some v -> Fmt.failwith "Unknown message type %S at %a" v Xml.pp x
 
   let parse x =
-    {
+    let r = {
       name = Xml.take_attr "name" x;
       ty = Xml.take_attr_opt "type" x |> parse_type x;
       since = Xml.take_attr_opt "since" x |> Option.value ~default:"1" |> int_of_string x;
@@ -122,6 +125,12 @@ module Message = struct
       description = Xml.take_sole_opt "description" x Description.parse;
       args = Xml.take_elements "arg" x Arg.parse;
     }
+    in
+    let arg_count = List.length r.args in
+    if arg_count > max_args then
+      Fmt.failwith "Too many arguments (%d) for Wayland message at %a" arg_count Xml.pp x
+    else
+      r
 end
 
 module Interface = struct
