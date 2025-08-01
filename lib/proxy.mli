@@ -1,6 +1,6 @@
 (** {2 Types} *)
 
-type ('a, +'v, 'role) t
+type ('a, +'v, 'role) t = ('a, 'v, 'role) Internal.versioned_proxy
 (** An [('a, 'v, 'role) t] is a proxy used by ['role] to send messages to an object with interface ['a] and version in ['v]. *)
 
 val user_data : ('a, _, 'role) t -> ('a, 'role) S.user_data
@@ -216,3 +216,15 @@ val wrong_type : parent:_ t -> expected:string -> _ t -> 'a
 (** [wrong_type ~parent ~expected t] fails with an exception complaining that [t] should have type [expected]. *)
 
 val trace : (module TRACE with type role = 'role) -> 'role Internal.tracer
+
+val post_error : ('a, [>`V1], [<`Server]) t -> code:int32 -> message:string -> 'b
+(** [post_error t ~code ~message] raises a protocol error with code [code] and message [message].
+    It does not return. *)
+
+exception Error of { object_id: int32; code: int32; message: string }
+(** Fatal error event.
+
+    Raised by servers to indicate a protocol error.
+
+    Clients should not raise this exception.  If they do, it will be treated as any other
+    uncaught exception. *)

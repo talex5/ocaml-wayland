@@ -358,6 +358,29 @@ let make_wrappers ~opens ~internal role (protocol : Protocol.t) f =
       line "type 'v t = (%a, 'v, %a) Proxy.t" pp_poly iface.name pp_role role;
       Fmt.list (pp_enum_link protocol iface) f iface.enums;
       let have_incoming = ref false in
+      let () =
+        let errors =
+          match role with
+          | `Client -> []
+          | `Server ->
+             let enum_is_error (i: Enum.t): bool = i.name = "error" in
+             match List.find_all enum_is_error iface.enums with
+             | [] -> []
+             | [e] -> e.entries
+             | _ :: _ :: _ -> failwith "Multiple error enums"
+        in
+        if errors <> [] then (
+          line "module Errors = struct";
+          (* Posting errors *)
+          let pp_post_error (error : Entry.t) =
+            line "@[<v2>let %s (proxy: 'v t) ~(message: string): 'a =" error.name;
+            line "@[<v2>Proxy.post_error proxy ~code:%dl ~message@]@]" (Int32.to_int error.value)
+          in
+          List.iter pp_post_error errors;
+          line "end"
+        )
+      in
+
       versions |> List.iter (fun (group : version_group) ->
           line "";
           line "(** {2 Version @[<h>%a@]} *)" Fmt.(list ~sep:comma int) group.versions;
