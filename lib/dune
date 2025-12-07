@@ -1,5 +1,6 @@
 (library
   (public_name wayland)
+  (flags (:standard -principal))
   (libraries eio eio.unix logs cstruct fmt))
 
 (rule

@@ -4,6 +4,8 @@ open Wayland_client
 let log_msg_src = Logs.Src.create "wayland-client" ~doc:"Wayland client messages"
 module Log_msg = (val Logs.src_log log_msg_src : Logs.LOG)
 
+type error_callback = object_id:int32 -> code:int32 -> message:string -> unit
+
 let init_logging = lazy (
   match Sys.getenv_opt "WAYLAND_DEBUG" with
   | Some ("1" | "client") -> Logs.Src.set_level log_msg_src (Some Logs.Debug)
@@ -41,13 +43,16 @@ module Trace : TRACE = struct
       )
 end
 
-let connect ?(trace=(module Trace : TRACE)) ~sw transport =
+let connect ?(trace=(module Trace : TRACE)) ~sw ?error_callback:error_callback transport =
   Lazy.force init_logging;
   let conn, wl_display = Connection.connect ~sw ~trace `Client transport @@ object
       inherit [_] Wl_display.v1
 
       method on_error _ ~object_id ~code ~message =
-        Log.err (fun f -> f "Received Wayland error: %ld %S on object %ld" code message object_id)
+        Fun.protect ~finally:(fun () -> transport#shutdown) @@ fun () ->
+          match error_callback with
+          | None -> Log.err (fun f -> f "Received Wayland error: %ld %S on object %ld" code message object_id)
+          | Some cb -> cb ~object_id ~code ~message
 
       method on_delete_id proxy ~id =
         Proxy.delete_other proxy id

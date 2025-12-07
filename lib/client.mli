@@ -4,7 +4,11 @@ type t
 
 module type TRACE = Proxy.TRACE with type role = [`Client]
 
-val connect : ?trace:(module TRACE) -> sw:Eio.Switch.t -> #S.transport -> t
+type error_callback = object_id:int32 -> code:int32 -> message:string -> unit
+(** [error_callback] is the type of callbacks to be invoked when a
+    fatal protocol error occurs. *)
+
+val connect : ?trace:(module TRACE) -> sw:Eio.Switch.t -> ?error_callback:error_callback -> #S.transport -> t
 (** [connect ~sw transport] runs the Wayland protocol over [transport]
     (typically created with {!Unix_transport.connect}).
 
@@ -12,11 +16,14 @@ val connect : ?trace:(module TRACE) -> sw:Eio.Switch.t -> #S.transport -> t
     If the thread gets an error then the switch will be cancelled.
 
     The caller is responsible for ensuring [transport] is closed,
-    but the library will shut it down if it gets end-of-file from the server.
+    but the library will shut it down if it gets end-of-file or a protocol
+    error from the server.
 
     @param trace Used to trace all messages sent and received.
                  The default tracer logs messages at debug level, and the log's source is set to debug level
-                 if $WAYLAND_DEBUG is "1" or "client" the first time {!connect} is called. *)
+                 if $WAYLAND_DEBUG is "1" or "client" the first time {!connect} is called.
+    @param error_callback Callback called if a protocol error happens.
+                          The default callback logs a message at error level. *)
 
 val sync : t -> unit
 (** Send a sync message to the server and wait for the reply.
