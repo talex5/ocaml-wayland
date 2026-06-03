@@ -22,7 +22,8 @@ let mangle name =
   | "method"
   | "handlers"
   | "h"
-  | "done" -> name ^ "_"
+  | "done"
+  | "new" -> name ^ "_"
   | x -> x
 
 let pp_role f = function
