@@ -24,3 +24,9 @@ val stop : t -> unit
 
 val dump : t Fmt.t
 (** Dump the state of the connection for debugging. *)
+
+val implementation_error : t -> string -> unit
+(** Disconnect the client with a message indicating a compositor bug. *)
+
+val no_memory : t -> string -> unit
+(** Disconnect the client with a message indicating that the server ran out of memory. *)

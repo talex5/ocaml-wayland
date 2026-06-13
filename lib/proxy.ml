@@ -1,6 +1,6 @@
 open Internal
 
-type ('a, 'v, 'role) t = ('a, 'role) Internal.proxy
+type ('a, 'v, 'role) t = ('a, 'v, 'role) versioned_proxy
 
 type ('a, 'v, 'role) proxy = ('a, 'v, 'role) t
 
@@ -116,13 +116,18 @@ let id t =
   if t.can_send then t.id
   else Fmt.invalid_arg "Attempt to use %a after destroying it" pp t
 
+exception Error of { id: int32; code: int32; message: string }
+
+let post_error t ~code ~message =
+  raise (Error { id = id t; code = code; message = message })
+
 let id_opt = function
   | None -> 0l
   | Some t -> id t
 
 let alloc t = Msg.alloc ~obj:t.id
 
-let send (type a) (t:_ t) (msg : (a, [`W]) Msg.t) =
+let send (type a) (t: (_, _, [<`Client|`Server]) t) (msg : (a, [`W]) Msg.t) =
   t.conn.trace.outbound t msg;
   if t.can_send then
     enqueue t.conn (Msg.cast msg)
@@ -172,7 +177,7 @@ let add_root conn (handler : (_, _, _) #Handler.t) =
 let on_delete t fn =
   Queue.add fn t.on_delete
 
-let delete t =
+let delete (t: ('a, [< `Client | `Server]) Internal.proxy): unit =
   let conn = t.conn in
   match Objects.find_opt t.id conn.objects with
   | Some (Generic t') when Obj.repr t == Obj.repr t' ->
