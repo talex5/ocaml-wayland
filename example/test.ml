@@ -114,6 +114,7 @@ let main ~net =
       method on_axis_stop _ ~time:_ ~axis:_ = ()
       method on_axis_value120 _ ~axis:_ ~value120:_ = ()
       method on_axis_relative_direction _ ~axis:_ ~direction:_ = ()
+      method on_warp _ ~surface_x:_ ~surface_y:_ = ()
     end
   in
   let configured, set_configured = Promise.create () in
