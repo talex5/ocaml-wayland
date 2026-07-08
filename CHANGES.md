@@ -1,3 +1,15 @@
+# v2.3
+
+- Update protocols (@alyssais #57).  
+  This also updates the scanner to handle the new `deprecated-since` and
+  `frozen` attributes, though they don't affect the generated code currently.
+
+- Mangle reserved keyword `new` to `new_` (@3L0C #55).
+
+- Replace `@<id>` with `#<id>` in logs (@talex5 #54).  
+  We previously used `@` to match the C libwayland, but that has now switched to `#`
+  (to avoid confusion with email addresses when anonymizing logs from users).
+
 # v2.2
 
 - Add cursor-shape-v1 and tablet-v2 protocols (@talex5 #51).
