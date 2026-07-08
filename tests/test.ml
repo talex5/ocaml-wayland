@@ -88,6 +88,7 @@ module S = struct
       method on_set_buffer_scale = failwith "Not implemented"
       method on_damage_buffer = failwith "Not implemented"
       method on_offset = failwith "Not implemented"
+      method on_get_release = failwith "Not implemented"
     end
 
   let make_compositor t proxy =
@@ -95,6 +96,7 @@ module S = struct
       inherit [_] Wl_compositor.v1
       method on_create_region _ region = make_region region
       method on_create_surface _ surface = make_surface t surface
+      method on_release = failwith "Not implemented"
     end
 
   let connect ~sw socket =

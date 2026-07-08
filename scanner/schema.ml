@@ -32,6 +32,7 @@ module Entry = struct
     value : int32;
     summary : string option;
     since : int;
+    deprecated_since : int option;
     description : Description.t option;
   }
 
@@ -41,6 +42,7 @@ module Entry = struct
       value = Xml.take_attr "value" x |> int32_of_string x;
       summary = Xml.take_attr_opt "summary" x;
       since = Xml.take_attr_opt "since" x |> Option.value ~default:"1" |> int_of_string x;
+      deprecated_since = Xml.take_attr_opt "deprecated-since" x |> Option.map (int_of_string x);
       description = Xml.take_sole_opt "description" x Description.parse;
     }
 end
@@ -128,6 +130,7 @@ module Interface = struct
   type t = {
     name : string;
     version : int;
+    frozen : bool;
     description : Description.t option;
     requests : Message.t list;
     events : Message.t list;
@@ -138,6 +141,7 @@ module Interface = struct
     {
       name = Xml.take_attr "name" x;
       version = Xml.take_attr "version" x |> int_of_string x;
+      frozen = Xml.take_attr_opt "frozen" x |> Option.map bool_of_string |> Option.value ~default:false;
       description = Xml.take_sole_opt "description" x Description.parse;
       requests = Xml.take_elements "request" x Message.parse;
       events = Xml.take_elements "event" x Message.parse;
